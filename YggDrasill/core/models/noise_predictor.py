@@ -6,13 +6,21 @@ from diffusers import (
     SD3Transformer2DModel,
     FluxTransformer2DModel,
 )
+from dataclasses import dataclass
+from diffusers.utils import BaseOutput
 from typing import Optional, Union
 
-from .noise_scheduler import NoiseScheduler
+
+@dataclass
+class ModelKey(BaseOutput):
+    dtype: torch.dtype = torch.float16
+    device: str = "cuda"
+    model_path: str = "GrafikXxxxxxxYyyyyyyyyyy/sdxl_Juggernaut"
+    model_type: str = "sd15"
 
 
 
-class NoisePredictor:
+class NoisePredictor(ModelKey):
     predictor: Union[
         UNet2DModel, 
         UNet2DConditionModel,
@@ -41,8 +49,9 @@ class NoisePredictor:
         self.to(device)
 
         # Инитим константы
-        self.path = model_path
-        self.type = model_type or "sd15"
+        self.dtype = dtype
+        self.model_path = model_path
+        self.model_type = model_type or "sd15"
         print(f"NoisePredictor model has successfully loaded from '{model_path}' checkpoint!")
         
     @property
@@ -107,7 +116,7 @@ class NoisePredictor:
 
         extra_kwargs = {}
 
-        # Пересобираем пришедшие аргументы под нужную модель, если те переданы
+        # Пересобираем пришедшие аргументы под нужную архитектуру, если те переданы
         if isinstance(self.predictor, UNet2DModel):
             extra_kwargs["class_labels"] = kwargs.get("class_labels", None)
 
@@ -126,7 +135,7 @@ class NoisePredictor:
 
         
         # Предсказывает шум моделью + собранными параметрами
-        predicted_noise = self.predictor.forward(
+        predicted_noise = self.predictor(
             timestep=timestep,
             sample=noisy_sample,
             **extra_kwargs,

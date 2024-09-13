@@ -9,7 +9,6 @@ from diffusers import (
     UniPCMultistepScheduler,
 )
 from typing import Optional, Union
-from diffusers.utils import BaseOutput
 
 
 
@@ -87,12 +86,28 @@ class NoiseScheduler:
         else:
             raise ValueError(f'Unknown scheduler name: {scheduler_name}')
         
-        self.name = scheduler_name
+        # Инитим ключ и константы
+        self.scheduler_name = scheduler_name
+        self.scheduler_key = {
+            "dtype": dtype,
+            "device": device,
+            "model_path": model_path,
+            "model_type": model_type or "sd15",
+        }
         print(f"Scheduler has successfully changed to '{scheduler_name}'")
+    # //////////////////////////////////////////////////////////////////////////////////// #
 
-        self.dtype = dtype
-        self.device = torch.device(device)
-        self.path = model_path
+    @property
+    def key(self):
+        return self.scheduler_key
+
+    @property
+    def dtype(self):
+        return self.scheduler_key["dtype"]
+    
+    @property
+    def device(self):
+        return torch.device(self.scheduler_key["device"])
 
     @property
     def scale_factor(self):
@@ -112,38 +127,6 @@ class NoiseScheduler:
         device: str = "cuda",
         dtype: torch.dtype = torch.float16,
     ):
-        if self.name is not scheduler_name:
-            self.__init__(self.path, device, dtype)
-    # //////////////////////////////////////////////////////////////////////////////////// #
+        if self.scheduler_name is not scheduler_name:
+            self.__init__(scheduler_name=scheduler_name, **self.key)
 
-    
-    
-    # ==================================================================================== #
-    def __call__(
-        self, 
-        timestep: int, 
-        noisy_sample: torch.FloatTensor,
-        noise_predict: Optional[torch.FloatTensor] = None,
-    ) -> torch.FloatTensor:        
-    # ==================================================================================== #
-        """
-        Если передано предсказание шума:
-            Вычисляет шумный sample с предыдущего шага 
-            noisy_sample[t] -> noisy_sample[t-1] 
-        Если предсказание шума не передано:
-            То скейлит noisy_sample с текущего шага 
-            noisy_sample[t] -> scaled_noisy_sample[t]
-        """
-        return (
-            self.scheduler.step(
-                timestep=timestep,
-                sample=noisy_sample,
-                model_output=noise_predict,
-            )
-            if noise_predict is not None else
-            self.scheduler.scale_model_input(
-                sample=noisy_sample,
-                timestep=timestep,
-            )
-        )
-    # ==================================================================================== #

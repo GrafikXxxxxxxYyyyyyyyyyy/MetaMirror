@@ -10,7 +10,7 @@ from ...models.models.clip_te_model import CLIPTextEncoderModel
 
 @dataclass
 class CLIPTextEncoderPipelineInput(BaseOutput):
-    prompt: Union[str, List[str]]
+    prompt: List[str]
     clip_skip: Optional[int] = None
     lora_scale: Optional[float] = None
     prompt_2: Optional[Union[str, List[str]]] = None
@@ -32,7 +32,6 @@ class CLIPTextEncoderPipeline:
         self,
         clip_encoder: CLIPTextEncoderModel,
         prompt: List[str],
-        do_cfg: bool = False,
         clip_skip: Optional[int] = None,
         lora_scale: Optional[float] = None,
         prompt_2: Optional[List[str]] = None,
@@ -40,6 +39,9 @@ class CLIPTextEncoderPipeline:
         negative_prompt_2: Optional[List[str]] = None,
         **kwargs,
     ):  
+        print("CLIPTextEncoderPipeline --->")
+        do_cfg = True if negative_prompt is not None else False
+
         # Получаем выходы всех энкодеров модели
         (
             prompt_embeds_1, 
@@ -51,6 +53,7 @@ class CLIPTextEncoderPipeline:
             clip_skip=clip_skip,
             lora_scale=lora_scale,
         )
+        
         if do_cfg:
             (
                 negative_prompt_embeds_1, 

@@ -22,15 +22,14 @@ class VaeModel:
         self.vae = AutoencoderKL.from_pretrained(
             model_path, 
             subfolder="vae",
-            torch_dtype=torch.float16,
+            torch_dtype=dtype,
             variant='fp16', 
             use_safetensors=True
         )
         self.to(device)
 
-        # Инициализируем ключ модели
-        self.type = model_type or "sd15"
-        self.path = model_path
+        self.model_path = model_path
+        self.model_type = model_type or "sd15"
         print(f"VAE model has successfully loaded from '{model_path}' checkpoint!")
 
     @property

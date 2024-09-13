@@ -11,8 +11,6 @@ from ..models.noise_scheduler import NoiseScheduler
 
 @dataclass
 class ForwardDiffusionInput(BaseOutput):
-    width: int
-    height: int
     batch_size: int = 1
     num_channels: int = 3
     strength: float = 1.0

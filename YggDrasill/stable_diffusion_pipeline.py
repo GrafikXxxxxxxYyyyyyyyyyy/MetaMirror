@@ -19,6 +19,7 @@ from .pipelines.text_encoder_pipeline import (
 @dataclass
 class StableDiffusionPipelineInput(BaseOutput):
     diffusion_input: DiffusionPipelineInput
+    use_refiner: bool = False
     guidance_scale: float = 5.0
     num_images_per_prompt: int= 1
     te_input: Optional[TextEncoderPipelineInput] = None
@@ -28,7 +29,7 @@ class StableDiffusionPipelineInput(BaseOutput):
 
 @dataclass
 class StableDiffusionPipelineOutput(BaseOutput):
-    pass
+    iamges: torch.FloatTensor
 
 
 
@@ -37,21 +38,21 @@ class StableDiffusionPipeline:
         self,
         model: StableDiffusionModel,
         diffusion_input: DiffusionPipelineInput,
+        te_input: Optional[TextEncoderPipelineInput] = None,
+        use_refiner: bool = False,
         guidance_scale: float = 5.0,
         num_images_per_prompt: int = 1,
-        te_input: Optional[TextEncoderPipelineInput] = None,
-        # ip_adapter_image: Optional[PipelineImageInput] = None,
-        # output_type: str = "pt",
-        use_refiner: bool = False,
-        refiner_steps: Optional[int] = None,
-        refiner_scale: Optional[float] = None,
-        # aesthetic_score: float = 6.0,
-        # negative_aesthetic_score: float = 2.5,
+                # ip_adapter_image: Optional[PipelineImageInput] = None,
+                # output_type: str = "pt",
+            # refiner_steps: Optional[int] = None,
+            # refiner_scale: Optional[float] = None,
+        aesthetic_score: float = 6.0,
+        negative_aesthetic_score: float = 2.5,
         **kwargs,
     ):
         """
         """
-        use_refiner = refiner_scale is not None or refiner_steps is not None
+        print("StableDiffusionPipeline --->")
         
         if te_input is not None and model.text_encoder is not None:
             te_pipeline = TextEncoderPipeline()
@@ -60,55 +61,117 @@ class StableDiffusionPipeline:
                 **te_input,
             )
 
+
+
         conditions = model(
-            te_output
+            te_output=te_output,
+            use_refiner=use_refiner,
+            guidance_scale=guidance_scale,
+            num_images_per_prompt=num_images_per_prompt,
+            aesthetic_score=aesthetic_score,
+            negative_aesthetic_score=negative_aesthetic_score,
         )
             
 
-        if "Вызываем основной диффузионный пайп":
-            diffusion = DiffusionPipeline()
+        diffusion_pipeline = DiffusionPipeline()
 
-            if (
-                refiner_scale is not None
-                and isinstance(refiner_scale, float)
-                and refiner_scale < 1.0
-                and refiner_scale > 0.0
-            ):
-                # Первый шаг 
-                diffusion_input.forward_input.denoising_end = refiner_scale        
-                diffusion_output = diffusion(
-                    model.diffuser,
-                    **diffusion_input,
-                )
+        # if use_refiner:
+        #     # if (
+        #     #     refiner_scale is not None
+        #     #     and isinstance(refiner_scale, float)
+        #     #     and refiner_scale < 1.0
+        #     #     and refiner_scale > 0.0
+        #     # ):
+        #     pass
+        
+        diffusion_output = diffusion_pipeline(
+            model.diffuser,
+            **diffusion_input,
+        )
 
-                # Вызывается модель, чтобы переключиться на рефайнер
-                _ = model(
-                    te_output,
-                    use_refiner=use_refiner,
-                )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        # if "Вызываем основной диффузионный пайп":
+        #     diffusion = DiffusionPipeline()
+
+            # if (
+            #     refiner_scale is not None
+            #     and isinstance(refiner_scale, float)
+            #     and refiner_scale < 1.0
+            #     and refiner_scale > 0.0
+            # ):
+        #         # Первый шаг 
+        #         diffusion_input.forward_input.denoising_end = refiner_scale        
+        #         diffusion_output = diffusion(
+        #             model.diffuser,
+        #             **diffusion_input,
+        #         )
+
+        #         # Вызывается модель, чтобы переключиться на рефайнер
+        #         _ = model(
+        #             te_output,
+        #             use_refiner=use_refiner,
+        #         )
                 
-                # Второй шаг
-                diffusion_input.forward_input.denoising_end = None
-                diffusion_input.forward_input.denoising_start = refiner_scale
-                diffusion_output = diffusion(
-                    model.diffuser,
-                    **diffusion_input,
-                )
+        #         # Второй шаг
+        #         diffusion_input.forward_input.denoising_end = None
+        #         diffusion_input.forward_input.denoising_start = refiner_scale
+        #         diffusion_output = diffusion(
+        #             model.diffuser,
+        #             **diffusion_input,
+        #         )
 
             
-            if (
-                refiner_steps is not None
-                and isinstance(refiner_steps, int)
-                and refiner_scale > 0
-            ):
-                diffusion_input.forward_input.num_inference_steps = refiner_steps
+        #     if (
+        #         refiner_steps is not None
+        #         and isinstance(refiner_steps, int)
+        #         and refiner_scale > 0
+        #     ):
+        #         diffusion_input.forward_input.num_inference_steps = refiner_steps
                 
-            diffusion_output = diffusion(
-                model.diffuser,
-                **diffusion_input,
-            )
+        #     diffusion_output = diffusion(
+        #         model.diffuser,
+        #         **diffusion_input,
+        #     )
 
 
-        return StableDiffusionPipelineOutput(
-            clear_sample=output,
-        )
+        # return StableDiffusionPipelineOutput(
+        #     clear_sample=output,
+        # )

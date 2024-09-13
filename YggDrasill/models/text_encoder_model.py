@@ -28,6 +28,8 @@ class TextEncoderModel:
             dtype=dtype,
         )
 
+        # self.transformer_encoder = 
+
         return
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
 
@@ -37,26 +39,9 @@ class TextEncoderModel:
         self,
         **kwargs,
     ):
-        # (
-        #     prompt_embeds_1, 
-        #     prompt_embeds_2, 
-        #     pooled_prompt_embeds
-        # ) = self.clip_encoder(
-        #     prompt=prompt,
-        #     prompt_2=prompt_2,
-        #     clip_skip=clip_skip,
-        #     lora_scale=lora_scale,
-        # )
 
         # # TODO: Добавить процедуру запутывания эмбеддингов
         # # <CODE HERE>
-
-        # # TODO: Описать класс трансформер модели transformer_te_model.py
-        # # t5_embeds = self.t5_encoder(
-        # #     prompt=prompt,
-        # #     clip_skip=clip_skip,
-        # #     lora_scale=lora_scale,
-        # # )
 
         return
     
