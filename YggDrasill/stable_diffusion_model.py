@@ -3,35 +3,12 @@ import torch
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple
 
-from .core.diffusion_model import DiffusionModel, DiffusionModelKey
+from .core.diffusion_model import DiffusionModel, DiffusionModelKey, Conditions
 from .pipelines.text_encoder_pipeline import TextEncoderModel, TextEncoderPipelineOutput
 
 
-@dataclass
-class StableDiffusionModelKey(DiffusionModelKey):
-    model_path: str = "GrafikXxxxxxxYyyyyyyyyyy/sdxl_Juggernaut"
-    model_type: str = "sdxl"
-    device: str = "cuda"
-    is_latent_model: bool = True
-    dtype: torch.dtype = torch.float16
-    scheduler_name: Optional[str] = "euler_a"
 
-
-
-# @dataclass
-# class StableDiffusionModelConditions(DiffusionModelConditions):
-#     timestep_cond: Optional[torch.Tensor] = None
-#     prompt_embeds: Optional[torch.FloatTensor] = None
-#     cross_attention_kwargs: Optional[Dict[str, Any]] = None
-#     added_cond_kwargs: Optional[Dict[str, torch.Tensor]] = None
-        
-        # # ControlNet
-        # mid_block_additional_residual: Optional[torch.Tensor] = None
-        # down_block_additional_residuals: Optional[Tuple[torch.Tensor]] = None
-
-
-
-class StableDiffusionModel:
+class StableDiffusionModel(DiffusionModelKey):
     diffuser: DiffusionModel
     text_encoder: Optional[TextEncoderModel] = None
     # image_encoder: Optional[ImageEncoderModel] = None
@@ -130,18 +107,19 @@ class StableDiffusionModel:
         te_output: Optional[TextEncoderPipelineOutput] = None,
         # ie_output: Optional[ImageEncoderPipelineOutput] = None,
         **kwargs,
-    ) -> StableDiffusionModelConditions:
+    ) -> None:
     # ================================================================================================================ #
         """
         Подготавливает нужную последовательность входных аргументов
         и обуславливающих значений, соответсвующих заданной модели диффузии
+        Также перенастраивает саму модельку
         """
         print("StableDiffusionModel --->")
 
         # if use_refiner:
         #     self.switch_to_refiner()
         
-        conditions = StableDiffusionModelConditions()
+        conditions = {}
 
         if te_output is not None:
             self.diffuser.do_cfg = te_output.do_cfg
@@ -195,8 +173,8 @@ class StableDiffusionModel:
 
             elif self.model_type == "flux":
                 pass
-
-
-        return conditions
+        
+        # Помещаем собранные условия внутрь модели в формате специального класса-обёртки
+        self.diffuser.conditions = Conditions(**conditions)
     # ================================================================================================================ #
         

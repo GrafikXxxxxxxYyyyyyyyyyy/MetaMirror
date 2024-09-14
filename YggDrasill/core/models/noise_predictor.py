@@ -8,7 +8,17 @@ from diffusers import (
 )
 from dataclasses import dataclass
 from diffusers.utils import BaseOutput
-from typing import Optional, Union
+from typing import Optional, Union, Dict, Any
+
+
+@dataclass
+class Conditions(BaseOutput):
+    class_labels: Optional[torch.Tensor] = None
+    prompt_embeds: Optional[torch.Tensor] = None
+    timestep_cond: Optional[torch.Tensor] = None
+    attention_mask: Optional[torch.Tensor] = None
+    cross_attention_kwargs: Optional[Dict[str, Any]] = None
+    added_cond_kwargs: Optional[Dict[str, torch.Tensor]] = None
 
 
 @dataclass
@@ -49,7 +59,6 @@ class NoisePredictor(ModelKey):
         self.to(device)
 
         # Инитим константы
-        self.dtype = dtype
         self.model_path = model_path
         self.model_type = model_type or "sd15"
         print(f"NoisePredictor model has successfully loaded from '{model_path}' checkpoint!")
@@ -57,6 +66,10 @@ class NoisePredictor(ModelKey):
     @property
     def config(self):
         return self.predictor.config
+    
+    @property
+    def dtype(self):
+        return self.predictor.dtype
     
     @property
     def device(self):
@@ -112,11 +125,9 @@ class NoisePredictor(ModelKey):
         Выполняет шаг предсказания шума на метке t для любого
         типа входных данных любой из имеющихся моделей
         """
-        # TODO: Добавить шаг планировщика
-
         extra_kwargs = {}
 
-        # Пересобираем пришедшие аргументы под нужную архитектуру, если те переданы
+        # Пересобираем пришедшие аргументы под нужную архитектуру(!), если те переданы
         if isinstance(self.predictor, UNet2DModel):
             extra_kwargs["class_labels"] = kwargs.get("class_labels", None)
 

@@ -23,7 +23,6 @@ class NoiseScheduler:
     ]
     scheduler_name: str = "euler"
 
-    # //////////////////////////////////////////////////////////////////////////////////// #
     def __init__(
         self,
         model_path: str,
@@ -33,7 +32,6 @@ class NoiseScheduler:
         scheduler_name: Optional[str] = None,
         **kwargs,
     ):     
-    # //////////////////////////////////////////////////////////////////////////////////// #
         # Инитится планировщик (по-умолчанию из эйлера)
         scheduler_name = scheduler_name or "euler"
         self.scheduler = EulerDiscreteScheduler.from_pretrained(
@@ -95,7 +93,6 @@ class NoiseScheduler:
             "model_type": model_type or "sd15",
         }
         print(f"Scheduler has successfully changed to '{scheduler_name}'")
-    # //////////////////////////////////////////////////////////////////////////////////// #
 
     @property
     def key(self):

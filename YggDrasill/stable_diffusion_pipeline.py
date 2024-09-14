@@ -29,7 +29,7 @@ class StableDiffusionPipelineInput(BaseOutput):
 
 @dataclass
 class StableDiffusionPipelineOutput(BaseOutput):
-    iamges: torch.FloatTensor
+    images: torch.FloatTensor
 
 
 
@@ -44,8 +44,8 @@ class StableDiffusionPipeline:
         num_images_per_prompt: int = 1,
                 # ip_adapter_image: Optional[PipelineImageInput] = None,
                 # output_type: str = "pt",
-            # refiner_steps: Optional[int] = None,
-            # refiner_scale: Optional[float] = None,
+        refiner_steps: Optional[int] = None,
+        refiner_scale: Optional[float] = None,
         aesthetic_score: float = 6.0,
         negative_aesthetic_score: float = 2.5,
         **kwargs,
@@ -61,8 +61,9 @@ class StableDiffusionPipeline:
                 **te_input,
             )
 
-
-
+        # Вызов модели просто формирует словарь условий и сохраняет, 
+        # которsq будет использована
+        # Дальше эти условия передаются в пайплайн для расшумления
         conditions = model(
             te_output=te_output,
             use_refiner=use_refiner,
@@ -72,22 +73,25 @@ class StableDiffusionPipeline:
             negative_aesthetic_score=negative_aesthetic_score,
         )
             
-
         diffusion_pipeline = DiffusionPipeline()
 
-        # if use_refiner:
+
+        if use_refiner:
         #     # if (
         #     #     refiner_scale is not None
         #     #     and isinstance(refiner_scale, float)
         #     #     and refiner_scale < 1.0
         #     #     and refiner_scale > 0.0
         #     # ):
-        #     pass
+            pass
         
-        diffusion_output = diffusion_pipeline(
+
+        images = diffusion_pipeline(
             model.diffuser,
             **diffusion_input,
         )
+
+        return images
 
 
 

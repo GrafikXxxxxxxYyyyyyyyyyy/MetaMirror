@@ -1,6 +1,6 @@
 import torch
 
-from typing import Optional
+from typing import Optional, Tuple
 from diffusers import AutoencoderKL
 
 
@@ -54,6 +54,10 @@ class VaeModel:
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
 
 
+
+    # ################################################################################################################ #
+    # Основной функционал модели VAE
+    # ################################################################################################################ #
     def retrieve_latents(
         self,
         encoder_output: torch.Tensor, 
@@ -70,13 +74,7 @@ class VaeModel:
             raise AttributeError("Could not access latents of provided encoder_output")
 
 
-
-    # ================================================================================================================ #
-    def encode(
-        self, 
-        image: torch.Tensor, 
-        generator: Optional[torch.Generator] = None, 
-    ) -> torch.Tensor:  
+    def encode(self, image: torch.Tensor, generator: Optional[torch.Generator] = None) -> torch.Tensor:  
         """
         По сути просто обёртка над методом .encode() оригинального энкодера, 
         которая делает upcast vae при необходимости
@@ -100,10 +98,7 @@ class VaeModel:
         return latents
 
     
-    def decode(
-        self,
-        latents: torch.Tensor,
-    ) -> torch.Tensor:  
+    def decode(self, latents: torch.Tensor) -> torch.Tensor:  
         # unscale/denormalize the latents denormalize with the mean and std if available and not None
         has_latents_mean = hasattr(self.config, "latents_mean") and self.config.latents_mean
         has_latents_std = hasattr(self.config, "latents_std") and self.config.latents_std
@@ -122,6 +117,41 @@ class VaeModel:
         images = self.vae.decode(latents, return_dict=False)[0]
 
         return images
-    # ================================================================================================================ #    
+    # ################################################################################################################ #
+
+
+
+    # ================================================================================================================ #
+    def __call__(
+        self,
+        images: Optional[torch.FloatTensor] = None,
+        latents: Optional[torch.FloatTensor] = None,
+        generator: Optional[torch.Generator] = None,
+        **kwargs,
+    ) -> Tuple[
+        Optional[torch.FloatTensor],
+        Optional[torch.FloatTensor],
+    ]:
+    # ================================================================================================================ #
+        """
+        Получает на вход изображение и/или латенты 
+        В зависимости от входа кодирует и/или декодирует данные
+        """
+        encoded_images = images
+        if images is not None:
+            images = images.to(device=self.device, dtype=self.dtype)
+            encoded_images = self.encode(images, generator)
+
+        decoded_images = latents
+        if latents is not None:
+            decoded_images = self.decode(latents)
+        
+        return encoded_images, decoded_images
+    # ================================================================================================================ #
+
+
+
+
+
 
 

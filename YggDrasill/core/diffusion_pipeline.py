@@ -2,31 +2,31 @@ import torch
 
 from dataclasses import dataclass
 from diffusers.utils import BaseOutput
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 from diffusers.image_processor import PipelineImageInput
 
-from .diffusion_model import DiffusionModel
 from .pipelines.vae_pipeline import VaePipeline
+from .diffusion_model import DiffusionModel, Conditions
 from .pipelines.forward_diffusion import (
     ForwardDiffusion,
     ForwardDiffusionInput,
 )
-from .pipelines.backward_diffusion import (
-    BackwardDiffusion,
-    BackwardDiffusionInput
-)
+from .pipelines.backward_diffusion import BackwardDiffusionInput
 
 
-
+@dataclass
 class DiffusionPipelineInput(BaseOutput):
     forward_input: ForwardDiffusionInput
     width: Optional[int] = None
     height: Optional[int] = None
     image: Optional[PipelineImageInput] = None
     generator: Optional[torch.Generator] = None
-    conditions: Optional[Dict[str, Any]] = None
     mask_image: Optional[PipelineImageInput] = None
-    masked_image: Optional[torch.FloatTensor] = None
+
+
+@dataclass
+class DiffusionPipelineOutput(BaseOutput):
+    images: torch.FloatTensor
 
 
 
@@ -41,22 +41,38 @@ class DiffusionPipeline:
         forward_input: ForwardDiffusionInput,
         width: Optional[int] = None,
         height: Optional[int] = None,
+        conditions: Optional[Conditions] = None,
         image: Optional[torch.FloatTensor] = None,
         generator: Optional[torch.Generator] = None,
-        conditions: Optional[Dict[str, Any]] = None,
         mask_image: Optional[torch.FloatTensor] = None,
-        masked_image: Optional[torch.FloatTensor] = None,
         **kwargs,
     ):  
         print("DiffusionPipeline --->")
-        IMAGE_PROCESSOR = VaePipeline()
 
+        # 0. Устанавливаем константы
+        width = width or diffuser.sample_size
+        height = height or diffuser.sample_size
 
+        # Инитим форвард пайплайн из ключа модели
         FORWARD = ForwardDiffusion(**diffuser.key)
-        BACKWARD = BackwardDiffusion(**diffuser.key)
-        BACKWARD.conditions = conditions
-        BACKWARD.do_cfg = diffuser.do_cfg
-        BACKWARD.guidance_scale = diffuser.guidance_scale
+        
+        # Препроцессим входные изображения
+        IMAGE_PROCESSOR = VaePipeline()
+        processor_output = IMAGE_PROCESSOR(
+            vae=diffuser.vae,
+            width=width,
+            height=height,
+            image=image,
+            generator=generator,
+            mask_image=mask_image,
+        )
+        image = processor_output.image_latents
+        
+        # Получаем пайп для шага обратного процесса из самой модели
+        BACKWARD = diffuser(
+            mask_image=processor_output.mask_latents,
+            masked_image=processor_output.masked_image_latents,
+        )
         
         forward_input.sample = image
         forward_input.generator = generator
@@ -70,8 +86,6 @@ class DiffusionPipeline:
 
         backward_input = BackwardDiffusionInput(
             timestep=-1,
-            mask_sample=mask_image,
-            masked_sample=masked_image,
             noisy_sample=forward_output.noisy_sample, 
         )
         for i, t in enumerate(forward_output.timesteps):
@@ -81,26 +95,33 @@ class DiffusionPipeline:
                 **backward_input
             )
 
-            # маскирование шума для не inpaint модели, можно вынести в BackwardDiffusion
-            if (
-                mask_image is not None
-                and masked_image is not None
-                and not diffuser.predictor.is_inpainting_model
-            ):
-                initial_mask, _ = (
-                    mask_image.chunk(2)
-                    if diffuser.do_cfg else
-                    (mask_image, None)
-                )
+            # # маскирование шума для не inpaint модели, можно вынести в BackwardDiffusion
+            # if (
+            #     mask_image is not None
+            #     and masked_image is not None
+            #     and not diffuser.predictor.is_inpainting_model
+            # ):
+            #     initial_mask, _ = (
+            #         mask_image.chunk(2)
+            #         if diffuser.do_cfg else
+            #         (mask_image, None)
+            #     )
 
-                if i < len(forward_output.timesteps) - 1:
-                    noise_timestep = forward_output.timesteps[i + 1]
-                    new_noisy_sample = BACKWARD.scheduler.add_noise(
-                        image, noise, torch.tensor([noise_timestep])
-                    ) 
+            #     if i < len(forward_output.timesteps) - 1:
+            #         noise_timestep = forward_output.timesteps[i + 1]
+            #         new_noisy_sample = BACKWARD.scheduler.add_noise(
+            #             image, noise, torch.tensor([noise_timestep])
+            #         ) 
 
-                backward_input.noisy_sample = (1 - initial_mask) * new_noisy_sample                     \
-                                                + initial_mask * backward_input.noisy_sample        
+            #     backward_input.noisy_sample = (1 - initial_mask) * new_noisy_sample                     \
+            #                                     + initial_mask * backward_input.noisy_sample        
+
+        vae_output = IMAGE_PROCESSOR(
+            vae=diffuser.vae,
+            latents=backward_input.noisy_sample
+        )
 
 
-        return less_noisy_sample 
+        return DiffusionPipelineOutput(
+            images=vae_output.images,
+        )
