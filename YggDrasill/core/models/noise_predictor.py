@@ -11,22 +11,36 @@ from diffusers.utils import BaseOutput
 from typing import Optional, Union, Dict, Any
 
 
+
+@dataclass
+class ModelKey(BaseOutput):
+    """
+    Базовый класс для инициализации всех пайплайнов и
+    моделей которые используются в проекте
+    """
+    dtype: torch.dtype = torch.float16
+    device: str = "cuda"
+    model_type: str = "sdxl"
+    model_path: str = "GrafikXxxxxxxYyyyyyyyyyy/sdxl_Juggernaut"
+
+
+
 @dataclass
 class Conditions(BaseOutput):
+    """
+    Общий класс всех дополнительных условий для всех
+    моделей которые используются в проекте
+    """
+    # UNet2DModel
     class_labels: Optional[torch.Tensor] = None
+    # UNet2DConditionModel
     prompt_embeds: Optional[torch.Tensor] = None
     timestep_cond: Optional[torch.Tensor] = None
     attention_mask: Optional[torch.Tensor] = None
     cross_attention_kwargs: Optional[Dict[str, Any]] = None
     added_cond_kwargs: Optional[Dict[str, torch.Tensor]] = None
-
-
-@dataclass
-class ModelKey(BaseOutput):
-    dtype: torch.dtype = torch.float16
-    device: str = "cuda"
-    model_path: str = "GrafikXxxxxxxYyyyyyyyyyy/sdxl_Juggernaut"
-    model_type: str = "sd15"
+    # ControlNet
+    # ...
 
 
 
@@ -48,7 +62,6 @@ class NoisePredictor(ModelKey):
         **kwargs,
     ) -> None:  
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
-        # TODO: Надо добавить выбор самых разных архитектур условных/безусловных/видео/звук(!)
         self.predictor = UNet2DConditionModel.from_pretrained(
             model_path, 
             subfolder='unet', 
@@ -56,7 +69,7 @@ class NoisePredictor(ModelKey):
             variant='fp16',
             use_safetensors=True
         )
-        self.to(device)
+        self.predictor.to(device=device, dtype=dtype)
 
         # Инитим константы
         self.model_path = model_path
@@ -78,65 +91,41 @@ class NoisePredictor(ModelKey):
     @property
     def is_latent_model(self):
         return self.predictor.config.in_channels == 4
+
+    @property
+    def is_inpainting_model(self):
+        return (
+            self.predictor.config.in_channels == 9 
+            or self.predictor.config.in_channels == 7
+        )
     
     @property
     def add_embed_dim(self):
         return self.predictor.add_embedding.linear_1.in_features
-
-    @property
-    def is_inpainting_model(self):
-        return self.predictor.config.in_channels == 9 or self.unet.config.in_channels == 7
-    
-
-    def to(
-        self, 
-        device=None,
-        dtype=None,
-    ):
-        self.predictor.to(device=device, dtype=dtype)
-
-
-    def reload(
-        self, 
-        model_path: str,
-        model_type: Optional[str] = None,
-        device: str = "cuda",
-    ):
-        self.__init__(
-            model_path=model_path,
-            device=device,
-            model_type=model_type, 
-        )
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
 
 
-    # TODO: Вынести в отдельный класс подключение лор
 
-
-    # ================================================================================================================ #
-    def __call__(
+    # TODO: Переделать метод так, чтобы собирал сразу мапу аргов под нужную архитектуру модели
+    def get_noise_predict(
         self,
         timestep: int,
         noisy_sample: torch.FloatTensor,
+        conditions: Optional[Conditions] = None,
         **kwargs,
     ) -> torch.FloatTensor:          
-    # ================================================================================================================ #
-        """
-        Выполняет шаг предсказания шума на метке t для любого
-        типа входных данных любой из имеющихся моделей
-        """
         extra_kwargs = {}
 
         # Пересобираем пришедшие аргументы под нужную архитектуру(!), если те переданы
         if isinstance(self.predictor, UNet2DModel):
-            extra_kwargs["class_labels"] = kwargs.get("class_labels", None)
+            extra_kwargs["class_labels"] = conditions.class_labels
 
         elif isinstance(self.predictor, UNet2DConditionModel):
-            extra_kwargs["prompt_embeds"] = kwargs.get("prompt_embeds", None)
-            extra_kwargs["class_labels"] = kwargs.get("class_labels", None)
-            extra_kwargs["timestep_cond"] = kwargs.get("timestep_cond", None)
-            extra_kwargs["cross_attention_kwargs"] = kwargs.get("cross_attention_kwargs", None)
-            extra_kwargs["added_cond_kwargs"] = kwargs.get("added_cond_kwargs", None)
+            extra_kwargs["class_labels"] = conditions.class_labels
+            extra_kwargs["timestep_cond"] = conditions.timestep_cond
+            extra_kwargs["added_cond_kwargs"] = conditions.added_cond_kwargs
+            extra_kwargs["encoder_hidden_states"] = conditions.prompt_embeds
+            extra_kwargs["cross_attention_kwargs"] = conditions.cross_attention_kwargs
 
         elif isinstance(self.predictor, SD3Transformer2DModel):
             pass
@@ -144,16 +133,45 @@ class NoisePredictor(ModelKey):
         elif isinstance(self.predictor, FluxTransformer2DModel):
             pass
 
-        
+
+        print(f"Step: {timestep}")
         # Предсказывает шум моделью + собранными параметрами
         predicted_noise = self.predictor(
             timestep=timestep,
             sample=noisy_sample,
             **extra_kwargs,
         )
+        print(f"Back step: {timestep}")
+
 
         return predicted_noise
+
+
+
     # ================================================================================================================ #
+    def __call__(
+        self,
+        timestep: int,
+        noisy_sample: torch.FloatTensor,
+        conditions: Optional[Conditions] = None,
+        **kwargs,
+    ) -> torch.FloatTensor:          
+    # ================================================================================================================ #
+        """
+        Выполняет шаг предсказания шума на метке t для любого
+        типа входных данных любой из имеющихся моделей
+        """
+        return self.get_noise_predict(
+            timestep=timestep,
+            conditions=conditions,
+            noisy_sample=noisy_sample,
+            **kwargs,
+        )
+    # ================================================================================================================ #
+
+
+
+
 
 
 
@@ -166,6 +184,8 @@ class NoisePredictor(ModelKey):
 #     class_labels: Optional[torch.Tensor] = None,
 #     return_dict: bool = True,
 # ) -> Union[UNet2DOutput, Tuple]:
+
+
 
 
 # def forward(
@@ -189,6 +209,7 @@ class NoisePredictor(ModelKey):
 
 
 
+
 # def forward(
 #         self,
 #         hidden_states: torch.FloatTensor,
@@ -201,6 +222,7 @@ class NoisePredictor(ModelKey):
 #     ) -> Union[torch.FloatTensor, Transformer2DModelOutput]:
 #         """
 #         The [`SD3Transformer2DModel`] forward method.
+
 
 
 

@@ -5,7 +5,7 @@ from transformers import (
     CLIPTokenizer,
     CLIPTextModelWithProjection,
 )
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional, Union
 from diffusers.utils.peft_utils import scale_lora_layers, unscale_lora_layers
 
 
@@ -32,10 +32,10 @@ class CLIPTextEncoderModel:
         model_type = model_type or "sd15"
 
         if model_type == "sd15":
-            # if hasattr(self, "tokenizer_2"):
-            #     delattr(self, "tokenizer_2")
-            # if hasattr(self, "text_encoder_2"):
-            #     delattr(self, "text_encoder_2")
+            if hasattr(self, "tokenizer_2"):
+                delattr(self, "tokenizer_2")
+            if hasattr(self, "text_encoder_2"):
+                delattr(self, "text_encoder_2")
             
             # инитим нужные
             self.tokenizer_1 = CLIPTokenizer.from_pretrained(
@@ -45,7 +45,7 @@ class CLIPTextEncoderModel:
             self.text_encoder_1 = CLIPTextModel.from_pretrained(
                 model_path, 
                 subfolder="text_encoder", 
-                torch_dtype=torch.float16,
+                torch_dtype=dtype,
                 variant='fp16',
                 use_safetensors=True
             )
@@ -57,7 +57,7 @@ class CLIPTextEncoderModel:
             self.text_encoder_1 = CLIPTextModel.from_pretrained(
                 model_path, 
                 subfolder="text_encoder", 
-                torch_dtype=torch.float16,
+                torch_dtype=dtype,
                 variant='fp16',
                 use_safetensors=True
             )
@@ -68,7 +68,7 @@ class CLIPTextEncoderModel:
             self.text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
                 model_path,
                 subfolder='text_encoder_2', 
-                torch_dtype=torch.float16,
+                torch_dtype=dtype,
                 variant='fp16',
                 use_safetensors=True
             )
@@ -78,17 +78,17 @@ class CLIPTextEncoderModel:
             raise ValueError(f"Unknown model_type '{self.type}'")   
         self.to(device)
 
-        # Инитим константы
-        self.path = model_path
-        self.type = model_type
+        self.model_type = model_type
+
         print(f"TextEncoder model has successfully loaded from '{model_path}' checkpoint!")
+
 
     @property
     def device(self):
         return self.text_encoder_1.device
 
     @property
-    def text_encoder_projection_dim(self):
+    def projection_dim(self):
         return (
             self.text_encoder_2.config.projection_dim 
             if hasattr(self, "text_encoder_2") else
@@ -99,31 +99,12 @@ class CLIPTextEncoderModel:
         self.text_encoder_1 = self.text_encoder_1.to(device, dtype=dtype)
         if hasattr(self, "text_encoder_2") and self.text_encoder_2 is not None:
             self.text_encoder_2 = self.text_encoder_2.to(device, dtype=dtype)
-
-    def reload(self, 
-        model_type: str,
-        model_path: str,
-        device: str = "cuda",
-    ):
-        self.__init__(
-            model_path=model_path,
-            model_type=model_type, 
-            device=self.device,
-        )
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
 
 
 
-    # # TODO: Прикрутить механизм использования лор, как для инференса так и для обучения
-    # def load_loras(
-    #     self
-    # ):
-    #     pass
-
-
-
-    # ================================================================================================================ #
-    def __call__(
+    # Вынесем в отдельный метод, который будет подтягиваться в методе call
+    def get_clip_embeddings(
         self,
         prompt: List[str],
         clip_skip: Optional[int] = None,
@@ -131,11 +112,6 @@ class CLIPTextEncoderModel:
         prompt_2: Optional[List[str]] = None,
         **kwargs,
     ):
-    # ================================================================================================================ #
-        """
-        Вызов модели возвращает закодированные представления со всех 
-        используемых текстовых моделей
-        """
         if lora_scale is not None:
             scale_lora_layers(self.text_encoder_1, lora_scale) 
             if hasattr(self, "text_encoder_2") and self.text_encoder_2 is not None:
@@ -156,12 +132,11 @@ class CLIPTextEncoderModel:
             output_hidden_states=True
         )
 
-        if self.type == "sd15":
-            # We also need to apply the final LayerNorm here to not mess with the
-            # representations. The `last_hidden_states` that we typically use for
-            # obtaining the final prompt representations passes through the LayerNorm
-            # layer.
+        if self.model_type == "sd15":
             prompt_embeds_1 = (
+                # We also need to apply the final LayerNorm here to not mess with the
+                # representations. The `last_hidden_states` that we typically use for
+                # obtaining the final prompt representations passes through the LayerNorm layer.
                 self.text_encoder_1.text_model.final_layer_norm(encoder_output[-1][-(clip_skip + 1)])
                 if clip_skip is not None else
                 encoder_output[0]
@@ -210,6 +185,38 @@ class CLIPTextEncoderModel:
             if hasattr(self, "text_encoder_2") and self.text_encoder_2 is not None:
                 unscale_lora_layers(self.text_encoder_2, lora_scale) 
         
+
+        return prompt_embeds_1, prompt_embeds_2, pooled_prompt_embeds
+
+
+
+    # ================================================================================================================ #
+    def __call__(
+        self,
+        prompt: List[str],
+        clip_skip: Optional[int] = None,
+        lora_scale: Optional[float] = None,
+        prompt_2: Optional[List[str]] = None,
+        **kwargs,
+    ):
+    # ================================================================================================================ #
+        """
+        Вызов модели возвращает закодированные представления со всех 
+        используемых текстовых моделей
+        """
+        print("CLIPTextEncoderModel --->")
+
+        (
+            prompt_embeds_1, 
+            prompt_embeds_2, 
+            pooled_prompt_embeds
+        ) = self.get_clip_embeddings(
+            prompt=prompt,
+            prompt_2=prompt_2,
+            clip_skip=clip_skip,
+            lora_scale=lora_scale,
+            **kwargs,
+        )        
 
         return prompt_embeds_1, prompt_embeds_2, pooled_prompt_embeds
     # ================================================================================================================ #

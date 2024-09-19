@@ -1,19 +1,23 @@
 import torch 
 
-from typing import List, Optional
+from typing import Optional
 from dataclasses import dataclass
 from diffusers.utils import BaseOutput
 
-from .stable_diffusion_model import StableDiffusionModel
+from .stable_diffusion_model import (
+    Conditions, 
+    StableDiffusionModel, 
+    StableDiffusionModelKey,
+)
 from .core.diffusion_pipeline import (
-    DiffusionPipeline,
+    DiffusionPipeline, 
     DiffusionPipelineInput,
 )
 from .pipelines.text_encoder_pipeline import (
     TextEncoderPipeline,
     TextEncoderPipelineInput,
-    TextEncoderPipelineOutput
 )
+
 
 
 @dataclass
@@ -21,10 +25,10 @@ class StableDiffusionPipelineInput(BaseOutput):
     diffusion_input: DiffusionPipelineInput
     use_refiner: bool = False
     guidance_scale: float = 5.0
-    num_images_per_prompt: int= 1
+    aesthetic_score: float = 6.0
+    negative_aesthetic_score: float = 2.5
     te_input: Optional[TextEncoderPipelineInput] = None
-    # ie_input: Optional[ImageEncoderPipelineInput] = None
-    pass
+
 
 
 @dataclass
@@ -33,94 +37,94 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 
 
-class StableDiffusionPipeline:
-    def __call__(
+class StableDiffusionPipeline(
+    DiffusionPipeline,
+    TextEncoderPipeline,  
+):  
+    model: Optional[StableDiffusionModel] = None
+
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
+    def __init__(
         self,
-        model: StableDiffusionModel,
-        diffusion_input: DiffusionPipelineInput,
-        te_input: Optional[TextEncoderPipelineInput] = None,
-        use_refiner: bool = False,
-        guidance_scale: float = 5.0,
-        num_images_per_prompt: int = 1,
-                # ip_adapter_image: Optional[PipelineImageInput] = None,
-                # output_type: str = "pt",
-        refiner_steps: Optional[int] = None,
-        refiner_scale: Optional[float] = None,
-        aesthetic_score: float = 6.0,
-        negative_aesthetic_score: float = 2.5,
+            # use_refiner: bool = False,
+            # refiner_steps: Optional[int] = None,
+            # refiner_scale: Optional[float] = None,
+        model_key: Optional[StableDiffusionModelKey] = None,
         **kwargs,
     ):
-        """
-        """
-        print("StableDiffusionPipeline --->")
-        
-        if te_input is not None and model.text_encoder is not None:
-            te_pipeline = TextEncoderPipeline()
-            te_output = te_pipeline(
-                model.text_encoder,
-                **te_input,
-            )
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
+        if model_key is not None:
+            self.model = StableDiffusionModel(**model_key)
+            self.device = self.model.device
+            self.dtype = self.model.dtype
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
 
-        # Вызов модели просто формирует словарь условий и сохраняет, 
-        # которsq будет использована
-        # Дальше эти условия передаются в пайплайн для расшумления
-        conditions = model(
+
+
+    def stable_diffusion_process(
+        self,
+        diffusion_input: DiffusionPipelineInput,
+        use_refiner: bool = False,
+        guidance_scale: float = 5.0,
+        aesthetic_score: float = 6.0,
+        negative_aesthetic_score: float = 2.5,
+        te_input: Optional[TextEncoderPipelineInput] = None,
+        **kwargs,
+    ):
+        if "1. Собираем и преобразуем обуславливающую информацию":
+            if self.model.use_text_encoder is not None and te_input is not None:
+                te_output = self.encode_prompt(**te_input)
+
+                self.do_cfg = te_output.do_cfg
+                self.guidance_scale = guidance_scale
+                # Изменяет размер тензора т.к может быть несколько картинок на промпт
+                diffusion_input.batch_size = te_output.batch_size
+
+
+        # Вызываем модель с доп аргументами, чтобы создать из эмбеддингов
+        # входы для диффузионной модели
+        conditions = self.model.get_conditions(
             te_output=te_output,
             use_refiner=use_refiner,
-            guidance_scale=guidance_scale,
-            num_images_per_prompt=num_images_per_prompt,
             aesthetic_score=aesthetic_score,
             negative_aesthetic_score=negative_aesthetic_score,
         )
-            
-        diffusion_pipeline = DiffusionPipeline()
 
-
-        if use_refiner:
-        #     # if (
-        #     #     refiner_scale is not None
-        #     #     and isinstance(refiner_scale, float)
-        #     #     and refiner_scale < 1.0
-        #     #     and refiner_scale > 0.0
-        #     # ):
-            pass
-        
-
-        images = diffusion_pipeline(
-            model.diffuser,
+        # Создаём новый расширенный словиями класс инпута
+        diffusion_input = DiffusionPipelineInput(
+            # conditions=Conditions(**conditions),
+            conditions=conditions,
             **diffusion_input,
         )
-
-        return images
-
-
+        if "2. Учитывая переданные аргументы, используем полученный/ые пайплайны":
+            diffusion_output = self.diffusion_process(**diffusion_input)
 
 
-
-
-
+        return StableDiffusionPipelineOutput(
+            images=diffusion_output.images
+        )  
 
 
 
+    # ================================================================================================================ #
+    def __call__(
+        self,
+        input: StableDiffusionPipelineInput,
+        model: Optional[StableDiffusionModel] = None,
+        **kwargs,
+    ):
+    # ================================================================================================================ #
+        print("StableDiffusionPipeline --->")
 
+        if (
+            model is not None 
+            and isinstance(model, StableDiffusionModel)
+        ):
+            self.model = model
+            self.scheduler = model.scheduler
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        return self.stable_diffusion_process(**input)
+    # ================================================================================================================ #
 
 
 
@@ -132,50 +136,3 @@ class StableDiffusionPipeline:
 
 
 
-        # if "Вызываем основной диффузионный пайп":
-        #     diffusion = DiffusionPipeline()
-
-            # if (
-            #     refiner_scale is not None
-            #     and isinstance(refiner_scale, float)
-            #     and refiner_scale < 1.0
-            #     and refiner_scale > 0.0
-            # ):
-        #         # Первый шаг 
-        #         diffusion_input.forward_input.denoising_end = refiner_scale        
-        #         diffusion_output = diffusion(
-        #             model.diffuser,
-        #             **diffusion_input,
-        #         )
-
-        #         # Вызывается модель, чтобы переключиться на рефайнер
-        #         _ = model(
-        #             te_output,
-        #             use_refiner=use_refiner,
-        #         )
-                
-        #         # Второй шаг
-        #         diffusion_input.forward_input.denoising_end = None
-        #         diffusion_input.forward_input.denoising_start = refiner_scale
-        #         diffusion_output = diffusion(
-        #             model.diffuser,
-        #             **diffusion_input,
-        #         )
-
-            
-        #     if (
-        #         refiner_steps is not None
-        #         and isinstance(refiner_steps, int)
-        #         and refiner_scale > 0
-        #     ):
-        #         diffusion_input.forward_input.num_inference_steps = refiner_steps
-                
-        #     diffusion_output = diffusion(
-        #         model.diffuser,
-        #         **diffusion_input,
-        #     )
-
-
-        # return StableDiffusionPipelineOutput(
-        #     clear_sample=output,
-        # )
