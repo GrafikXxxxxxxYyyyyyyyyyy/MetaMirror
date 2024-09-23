@@ -9,6 +9,10 @@ from ..models.vae_model import VaeModel
 from ..diffusion_model import DiffusionModelKey
 
 
+
+
+
+
 @dataclass
 class VaePipelineInput(BaseOutput):
     width: Optional[int] = None
@@ -17,6 +21,10 @@ class VaePipelineInput(BaseOutput):
     latents: Optional[torch.FloatTensor] = None
     generator: Optional[torch.Generator] = None
     mask_image: Optional[PipelineImageInput] = None
+
+
+
+
 
 
 @dataclass
@@ -28,8 +36,12 @@ class VaePipelineOutput(BaseOutput):
 
 
 
+
+
+
+# НИ ОТ ЧЕГО НЕ НАСЛЕДУЕТСЯ + ХРАНИТ СВОЙ VAE
 class VaePipeline:
-    model: Optional[VaeModel] = None
+    vae: Optional[VaeModel] = None
 
     def __init__(
         self,
@@ -38,12 +50,14 @@ class VaePipeline:
     ):
         if model_key is not None:
             self.vae = VaeModel(**model_key)
+    
 
 
-    def pre_post_process(
+    def vae_pipeline_call(
         self, 
         width: Optional[int] = None,
         height: Optional[int] = None,
+            # vae: Optional[VaeModel] = None,
         image: Optional[PipelineImageInput] = None,
         generator: Optional[torch.Generator] = None,
         mask_image: Optional[PipelineImageInput] = None,
@@ -55,23 +69,21 @@ class VaePipeline:
         2) Кодирует картинку (и маски) в латентное представление
         3) Декодирует пришедшие на вход латентные представления
         """
-        use_vae = (
-            True 
-            if hasattr(self.model, "vae") and self.model.vae is not None else
-            False
-        )
+        print("VaePipeline --->")
+        
+        use_vae = True if self.vae is not None else False
 
         # Инициализируем необходимые классы
         image_processor = VaeImageProcessor(
             vae_scale_factor=(
-                self.model.vae_scale_factor
+                self.vae.scale_factor
                 if use_vae else
                 1
             )
         )
         mask_processor = VaeImageProcessor(
             vae_scale_factor=(
-                self.model.vae_scale_factor
+                self.vae.scale_factor
                 if use_vae else
                 1
             ), 
@@ -98,7 +110,7 @@ class VaePipeline:
                 # Возвращает либо латентное представление картинки
                 # либо запроцешенную картинку
                 image_latents = (
-                    self.model.get_processed_latents_or_images(
+                    self.vae(
                         images=image,
                         generator=generator,
                     )[0]
@@ -127,7 +139,7 @@ class VaePipeline:
                 )
 
                 masked_image_latents = (
-                    self.model.get_processed_latents_or_images(
+                    self.vae(
                         images=masked_image,
                         generator=generator,
                     )[0]
@@ -137,7 +149,7 @@ class VaePipeline:
 
         if latents is not None:
             images = (
-                self.model.get_processed_latents_or_images(
+                self.vae(
                     latents=latents
                 )[1]
                 if use_vae else
@@ -154,19 +166,17 @@ class VaePipeline:
         )
     
 
-
+    
     def __call__(
-        self, 
+        self,
         input: VaePipelineInput,
         vae: Optional[VaeModel] = None,
         **kwargs,
-    ) -> VaePipelineOutput:  
-        print("VaePipeline --->")
-
+    ):
         if vae is not None:
             self.vae = vae
-    
-        return self.pre_post_process(**input)
+
+        return self.vae_pipeline_call(**input)
 
 
 

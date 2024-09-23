@@ -12,16 +12,20 @@ from typing import Optional, Union, Dict, Any
 
 
 
+
+
 @dataclass
 class ModelKey(BaseOutput):
     """
-    Базовый класс для инициализации всех пайплайнов и
+    Базовый класс для инициализации всех 
     моделей которые используются в проекте
     """
     dtype: torch.dtype = torch.float16
     device: str = "cuda"
     model_type: str = "sdxl"
     model_path: str = "GrafikXxxxxxxYyyyyyyyyyy/sdxl_Juggernaut"
+
+
 
 
 
@@ -39,12 +43,12 @@ class Conditions(BaseOutput):
     attention_mask: Optional[torch.Tensor] = None
     cross_attention_kwargs: Optional[Dict[str, Any]] = None
     added_cond_kwargs: Optional[Dict[str, torch.Tensor]] = None
-    # ControlNet
-    # ...
 
 
 
-class NoisePredictor(ModelKey):
+
+
+class NoisePredictor:
     predictor: Union[
         UNet2DModel, 
         UNet2DConditionModel,
@@ -106,45 +110,7 @@ class NoisePredictor(ModelKey):
 
 
 
-    # TODO: Переделать метод так, чтобы собирал сразу мапу аргов под нужную архитектуру модели
-    def get_noise_predict(
-        self,
-        timestep: int,
-        noisy_sample: torch.FloatTensor,
-        conditions: Optional[Conditions] = None,
-        **kwargs,
-    ) -> torch.FloatTensor:          
-        extra_kwargs = {}
-
-        # Пересобираем пришедшие аргументы под нужную архитектуру(!), если те переданы
-        if isinstance(self.predictor, UNet2DModel):
-            extra_kwargs["class_labels"] = conditions.class_labels
-
-        elif isinstance(self.predictor, UNet2DConditionModel):
-            extra_kwargs["class_labels"] = conditions.class_labels
-            extra_kwargs["timestep_cond"] = conditions.timestep_cond
-            extra_kwargs["added_cond_kwargs"] = conditions.added_cond_kwargs
-            extra_kwargs["encoder_hidden_states"] = conditions.prompt_embeds
-            extra_kwargs["cross_attention_kwargs"] = conditions.cross_attention_kwargs
-
-        elif isinstance(self.predictor, SD3Transformer2DModel):
-            pass
-
-        elif isinstance(self.predictor, FluxTransformer2DModel):
-            pass
-
-
-        print(f"Step: {timestep}")
-        # Предсказывает шум моделью + собранными параметрами
-        predicted_noise = self.predictor(
-            timestep=timestep,
-            sample=noisy_sample,
-            **extra_kwargs,
-        )
-        print(f"Back step: {timestep}")
-
-
-        return predicted_noise
+    # Не имеет других методов кроме вызова
 
 
 
@@ -153,20 +119,38 @@ class NoisePredictor(ModelKey):
         self,
         timestep: int,
         noisy_sample: torch.FloatTensor,
-        conditions: Optional[Conditions] = None,
         **kwargs,
     ) -> torch.FloatTensor:          
     # ================================================================================================================ #
-        """
-        Выполняет шаг предсказания шума на метке t для любого
-        типа входных данных любой из имеющихся моделей
-        """
-        return self.get_noise_predict(
+        conditions = {}
+
+        # Пересобираем пришедшие аргументы под нужную архитектуру(!), если те переданы
+        if isinstance(self.predictor, UNet2DModel):
+            conditions["class_labels"] = kwargs.get("class_labels", None)
+
+        elif isinstance(self.predictor, UNet2DConditionModel):
+            conditions["class_labels"] = kwargs.get("class_labels", None)
+            conditions["timestep_cond"] = kwargs.get("timestep_cond", None)
+            conditions["added_cond_kwargs"] = kwargs.get("added_cond_kwargs", None)
+            conditions["encoder_hidden_states"] = kwargs.get("prompt_embeds", None)
+            conditions["cross_attention_kwargs"] = kwargs.get("cross_attention_kwargs", None)
+
+        elif isinstance(self.predictor, SD3Transformer2DModel):
+            pass
+
+        elif isinstance(self.predictor, FluxTransformer2DModel):
+            pass
+
+
+        # Предсказывает шум моделью + собранными параметрами
+        predicted_noise = self.predictor(
             timestep=timestep,
-            conditions=conditions,
-            noisy_sample=noisy_sample,
-            **kwargs,
+            sample=noisy_sample,
+            **conditions,
         )
+
+
+        return predicted_noise
     # ================================================================================================================ #
 
 

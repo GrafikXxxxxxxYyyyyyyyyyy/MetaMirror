@@ -5,12 +5,11 @@ from diffusers.utils import BaseOutput
 from typing import List, Optional, Union, Dict, Any
 
 from .pipelines.clip_te_pipeline import (
+    ModelKey,
     CLIPTextEncoderPipeline, 
     CLIPTextEncoderPipelineInput,
-    CLIPTextEncoderPipelineOutput,
 )
-from ..models.text_encoder_model import TextEncoderModel
-# from ..stable_diffusion_model import StableDiffusionModelKey
+from ...models.models.text_encoder_model import TextEncoderModel
 
 
 
@@ -36,17 +35,21 @@ class TextEncoderPipelineOutput(BaseOutput):
 
 class TextEncoderPipeline(
     CLIPTextEncoderPipeline,
-    # TransformerTextEncoderPipeline
+        # TransformerTextEncoderPipeline
 ):  
     model: Optional[TextEncoderModel] = None
 
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
     def __init__(
         self,
-        model_key = None,
+        model_key: Optional[ModelKey] = None,
         **kwargs,
     ):
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
         if model_key is not None:
-            self.model = TextEncoderModel(**model_key)
+            self.clip_encoder = TextEncoderModel(**model_key)
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
+
 
 
     def encode_prompt(
@@ -60,11 +63,15 @@ class TextEncoderPipeline(
         negative_prompt_2: Optional[Union[str, List[str]]] = None,
         **kwargs,
     ) -> TextEncoderPipelineOutput:
-        
-        if "1. Подготавливаем необходимые аргументы":
-            # Устанавливаем метку do_cfg исходя из наличия негативного промпта
-            do_cfg = True if negative_prompt is not None else False
+        """
+        Кодирует полученные промпты и моделью CLIP и моделью Transformer (возможно)
+        """
+        # Устанавливаем метку do_cfg исходя из наличия негативного промпта
+        do_cfg = True if negative_prompt is not None else False
 
+
+
+        if "1. Нормализуем входные промпты":
             prompt = prompt or ""
             prompt = [prompt] if isinstance(prompt, str) else prompt
             prompt_2 = prompt_2 or prompt
@@ -82,7 +89,8 @@ class TextEncoderPipeline(
             batch_size = len(prompt) * num_images_per_prompt
 
         
-        if "2. Получаем эмбеддинги с моделей":
+
+        if "2. Получаем эмбеддинги со всех моделей что имеются":
             clip_output = self.encode_clip_prompt(
                 prompt = prompt,
                 prompt_2 = prompt_2,
@@ -91,9 +99,6 @@ class TextEncoderPipeline(
                 num_images_per_prompt = num_images_per_prompt,
             )
 
-            print(clip_output.prompt_embeds_1.shape)
-            print(clip_output.prompt_embeds_2.shape)
-            print(clip_output.pooled_prompt_embeds.shape)
             # И применяем инструкции cfg если необходимо
             if do_cfg:
                 negative_clip_output = self.encode_clip_prompt(
@@ -108,18 +113,18 @@ class TextEncoderPipeline(
                 clip_output.prompt_embeds_2 = torch.cat([negative_clip_output.prompt_embeds_2, clip_output.prompt_embeds_2], dim=0)
                 clip_output.pooled_prompt_embeds = torch.cat([negative_clip_output.pooled_prompt_embeds, clip_output.pooled_prompt_embeds], dim=0)
 
-                print(clip_output.prompt_embeds_1.shape)
-                print(clip_output.prompt_embeds_2.shape)
-                print(clip_output.pooled_prompt_embeds.shape)
-
-            # TODO: Получаем эмбеддинги с модели Transformer
+            # TODO: Аналогично получаем эмбеддинги с модели Transformer
             # <...>
+
+
 
         cross_attention_kwargs = (
             {"scale": lora_scale}
             if lora_scale is not None else
             None
         )
+
+
 
         return TextEncoderPipelineOutput(
             do_cfg=do_cfg,
@@ -129,26 +134,24 @@ class TextEncoderPipeline(
             pooled_clip_embeds=clip_output.pooled_prompt_embeds,
             cross_attention_kwargs=cross_attention_kwargs
         )
-    
-    
 
+    
+    
+    # ================================================================================================================ #
     def __call__(
         self,
-        input: TextEncoderPipelineInput,
         text_encoder: Optional[TextEncoderModel] = None,
         **kwargs,
     ) -> TextEncoderPipelineOutput:
-        print("TextEncoderPipeline --->")
-
-        # Если на вход передана модель, то устанавливаем её в качестве собственной
+    # ================================================================================================================ #
         if (
             text_encoder is not None 
             and isinstance(text_encoder, TextEncoderModel)
         ):
             self.model = text_encoder
 
-
-        return self.encode_prompt(**input)
+        return self.encode_prompt(**kwargs)
+    # ================================================================================================================ #
 
     
 

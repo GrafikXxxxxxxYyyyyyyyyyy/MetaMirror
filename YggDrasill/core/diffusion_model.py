@@ -1,74 +1,84 @@
 import torch
 
+from typing import Optional
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from diffusers.utils import BaseOutput
 
 from .models.vae_model import VaeModel
-from .models.noise_scheduler import NoiseScheduler
-from .models.noise_predictor import ModelKey, Conditions,  NoisePredictor
+from .models.backward_diffuser import BackwardDiffuserKey, BackwardDiffuserConditions, BackwardDiffuser
+
+
 
 
 
 @dataclass
-class DiffusionModelKey(ModelKey):
+class DiffusionModelKey(BackwardDiffuserKey):
     is_latent_model: bool = True
-    scheduler_name: str = "euler"
 
 
 
-class DiffusionModel(
-    VaeModel,
-    NoiseScheduler,
-    NoisePredictor,
-    DiffusionModelKey
-):
-    """
-    
-    """
-    use_refiner: bool = False
+
+
+@dataclass
+class DiffusionModelConditions(BaseOutput):
+    need_time_ids: bool = True
     aesthetic_score: float = 6.0
     negative_aesthetic_score: float = 2.5
     text_encoder_projection_dim: Optional[int] = None
 
+    need_timestep_cond: bool = False
+
+    backward_conditions: Optional[BackwardDiffuserConditions] = None
+
+    # ControlNet conditions
+    # ...
+
+
+
+
+
+class DiffusionModel(BackwardDiffuser):  
+    vae: Optional[VaeModel] = None
+
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
     def __init__(
         self,
+        model_path: str,
+        device: str = "cuda",
         is_latent_model: bool = False,
+        model_type: Optional[str] = None,
+        dtype: torch.dtype = torch.float16,
         scheduler_name: Optional[str] = None,
         **kwargs,
     ):  
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
-        # Инитим self.scheduler 
-        NoiseScheduler.__init__(
-            self, 
-            scheduler_name=scheduler_name,
-            **kwargs
-        )
         # Инитим основную модель предсказания шума
-        NoisePredictor.__init__(
-            self, 
-            **kwargs
+        super().__init__( 
+            dtype=dtype,
+            device=device,
+            model_path=model_path,
+            model_type=model_type,
+            scheduler_name=scheduler_name,
         )
-        # Если необходимо инитим self.vae
+
+        # Если латентная модель, то инитим ещё и vae
         if is_latent_model:
-            VaeModel.__init__(
-                self,
-                **kwargs,
+            self.vae = VaeModel(
+                dtype=dtype,
+                device=device,
+                model_path=model_path,
+                model_type=model_type,
             )
+        self.is_latent_model = is_latent_model
 
-    @property
-    def dtype(self):
-        return self.predictor.dtype
+        print("\t<<<DiffusionModel ready!>>>\t")
 
-    @property
-    def device(self):
-        return self.predictor.device
 
     @property
     def sample_size(self):
         return (
-            self.predictor.config.sample_size * self.vae_scale_factor
-            if self.vae is not None else
+            self.predictor.config.sample_size * self.vae.scale_factor
+            if self.is_latent_model else
             self.predictor.config.sample_size    
         )
     
@@ -76,29 +86,30 @@ class DiffusionModel(
     def num_channels(self):
         return (
             self.vae.config.latent_channels
-            if self.vae is not None else
+            if self.is_latent_model else
             self.predictor.config.in_channels
         )
-
-    def maybe_switch_to_refiner(self, use_refiner: bool):
-        if use_refiner:
-            self.predictor = NoisePredictor(
-                model_path="REFINER_PATH",
-                **self.key,
-            )
-            self.use_refiner = True
-
-    def maybe_switch_to_base(self, use_refiner: bool):
-        if not use_refiner:
-            self.predictor = NoisePredictor(**self.key)
-            self.use_refiner = False
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
 
 
 
-    # ################################################################################################################ #
-    # Основной функционал модели DiffusionModel
-    # ################################################################################################################ #
+    # # TODO: добавить ControlNet
+    # # ################################################################################################################ #
+    # def get_extended_conditions(
+    #     self,
+    #     batch_size: int = 1,
+    #     do_cfg: bool = False,
+    #     **kwargs,
+    # ) -> Optional[Conditions]:
+    # # ################################################################################################################ #
+    #     """
+    #     Данный метод расширяет набор условий на хвод мордели своими внутренними условиями 
+    #     или дополнительными условиями ControlNet модели
+    #     """
+    # # ################################################################################################################ #
+
+    
+
     def _get_add_time_ids(
         self,
         original_size,
@@ -146,66 +157,52 @@ class DiffusionModel(
         return add_time_ids, add_neg_time_ids
 
 
-    def get_extended_conditions(
+
+    def get_internal_conditions(
         self,
-        batch_size: int = 1,
-        do_cfg: bool = False,
-        width: Optional[int] = None,
-        height: Optional[int] = None,
-        conditions: Optional[Conditions] = None,
-        **kwargs,
-    ) -> Optional[Conditions]:
-        """
-        Данный метод расширяет набор условий на хвод мордели своими внутренними условиями 
-        или дополнительными условиями ControlNet модели
-        """
-        if conditions is not None:
+    ):
+        if self.model_type == "sd15":
+            pass
 
-            if self.model_type == "sd15":
-                pass
+        elif self.model_type == "sdxl":
+            # Для модели SDXL почему-то нужно обязательно расширить 
+            # дополнительные аргументы временными метками 
+            add_time_ids, add_neg_time_ids = self._get_add_time_ids(
+                original_size = (height, width),
+                crops_coords_top_left = (0, 0),
+                aesthetic_score = self.aesthetic_score,
+                negative_aesthetic_score = self.negative_aesthetic_score,
+                target_size = (height, width),
+                negative_original_size = (height, width),
+                negative_crops_coords_top_left = (0, 0),
+                negative_target_size = (height, width),
+                addition_time_embed_dim = self.predictor.config.addition_time_embed_dim,
+                expected_add_embed_dim = self.add_embed_dim,
+                dtype = self.model.dtype,
+                text_encoder_projection_dim = self.text_encoder_projection_dim,
+                requires_aesthetics_score = self.use_refiner,
+            )
+            add_time_ids = add_time_ids.repeat(batch_size, 1)
+            add_neg_time_ids = add_neg_time_ids.repeat(batch_size, 1)
+            if do_cfg:
+                add_time_ids = torch.cat([add_neg_time_ids, add_time_ids], dim=0)
+            
+            conditions.added_cond_kwargs["time_ids"] = add_time_ids.to(self.model.device)
 
-            elif self.model_type == "sdxl":
-                # Для модели SDXL почему-то нужно обязательно расширить 
-                # дополнительные аргументы временными метками 
-                add_time_ids, add_neg_time_ids = self._get_add_time_ids(
-                    original_size = (height, width),
-                    crops_coords_top_left = (0, 0),
-                    aesthetic_score = self.aesthetic_score,
-                    negative_aesthetic_score = self.negative_aesthetic_score,
-                    target_size = (height, width),
-                    negative_original_size = (height, width),
-                    negative_crops_coords_top_left = (0, 0),
-                    negative_target_size = (height, width),
-                    addition_time_embed_dim = self.predictor.config.addition_time_embed_dim,
-                    expected_add_embed_dim = self.add_embed_dim,
-                    dtype = self.dtype,
-                    text_encoder_projection_dim = self.text_encoder_projection_dim,
-                    requires_aesthetics_score = self.use_refiner,
-                )
-                add_time_ids = add_time_ids.repeat(batch_size, 1)
-                add_neg_time_ids = add_neg_time_ids.repeat(batch_size, 1)
-                if do_cfg:
-                    add_time_ids = torch.cat([add_neg_time_ids, add_time_ids], dim=0)
-                
-                conditions.added_cond_kwargs["time_ids"] = add_time_ids.to(self.device)
+        elif self.model.model_type == "sd3":
+            pass
 
-            elif self.model_type == "sd3":
-                pass
+        elif self.model.model_type == "flux":
+            pass
 
-            elif self.model_type == "flux":
-                pass
-
-
-        return conditions    
-    # ################################################################################################################ #
 
     
 
-    # ================================================================================================================ #
-    def __call__(self, **kwargs):
-    # ================================================================================================================ #
-        print("DiffusionModel --->")
+    # # ================================================================================================================ #
+    # def __call__(self, **kwargs):
+    # # ================================================================================================================ #
+    #     print("DiffusionModel --->")
 
-        return self.get_extended_conditions(**kwargs)
-    # ================================================================================================================ #
+    #     return self.get_extended_conditions(**kwargs)
+    # # ================================================================================================================ #
     
