@@ -265,6 +265,8 @@ class CLIPTextEncoderModel:
 
 
         # И второй если есть, второй моделью 
+        prompt_embeds_2: Optional[torch.FloatTensor] = None
+        pooled_prompt_embeds: Optional[torch.FloatTensor] = None
         if prompt_2 is not None:
             prompt_embeds_2, pooled_prompt_embeds = self.clip_encoder_2(
                 prompt=prompt_2,
@@ -277,7 +279,7 @@ class CLIPTextEncoderModel:
             pooled_prompt_embeds = pooled_prompt_embeds.view(bs_embed * num_images_per_prompt, -1)
             
         
-        return output
+        return prompt_embeds_1, prompt_embeds_2, pooled_prompt_embeds
     
 
 

@@ -18,7 +18,7 @@ from .conditioner_model import ConditionerModel
 
 @dataclass
 class ConditionerPipelineInput(BaseOutput):
-    te_input: TextEncoderPipelineInput
+    te_input: Optional[TextEncoderPipelineInput] = None
 
 
 
@@ -64,13 +64,14 @@ class ConditionerPipeline(
         te_input: TextEncoderPipelineInput,
             # ie_output: Optional[ImageEncoderPipelineOutput] = None,
             # use_refiner
-        **kwargs,
     ):
     # ################################################################################################################ #
-        print("HERE!", te_input)
+        print(te_input)
+
         # Собираем текстовые и картиночные условия генерации
         te_output: Optional[TextEncoderPipelineOutput] = None
-        if "1. Вызывам собственный энкодер":
+        # if "1. Вызывам собственный энкодер":
+        if te_input is not None:
             te_output = self.encode_prompt(**te_input)
 
             do_cfg = te_output.do_cfg
@@ -115,6 +116,8 @@ class ConditionerPipeline(
             and isinstance(conditioner, ConditionerModel)
         ):
             self.model = conditioner
+
+        print(input)
 
         return self.retrieve_external_conditions(**input)
     # ================================================================================================================ #
