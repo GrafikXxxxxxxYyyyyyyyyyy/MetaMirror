@@ -31,10 +31,9 @@ class TextEncoderPipelineInput(BaseOutput):
 class TextEncoderPipelineOutput(BaseOutput):
     do_cfg: bool
     batch_size: int
-    clip_embeds_1: torch.FloatTensor
-    clip_embeds_2: Optional[torch.FloatTensor] = None
-        # transformer_embeds: Optional[torch.FloatTensor] = None
-    pooled_clip_embeds: Optional[torch.FloatTensor] = None
+    prompt_embeds: torch.FloatTensor
+    prompt_embeds_2: Optional[torch.FloatTensor] = None
+    pooled_prompt_embeds: Optional[torch.FloatTensor] = None
     cross_attention_kwargs: Optional[Dict[str, Any]] = None
 
 
@@ -92,7 +91,11 @@ class TextEncoderPipeline:
 
 
         if "2. Кодируем входные промпты":
-            prompt_embeds_1, prompt_embeds_2, pooled_prompt_embeds = self.model(
+            (
+                prompt_embeds, 
+                prompt_embeds_2, 
+                pooled_prompt_embeds
+            ) = self.model(
                 prompt=prompt,
                 prompt_2=prompt_2,
                 clip_skip=clip_skip,
@@ -100,9 +103,24 @@ class TextEncoderPipeline:
                 num_images_per_prompt=num_images_per_prompt,
             )
             if do_cfg:
-                pass
+                (
+                    negative_prompt_embeds, 
+                    negative_prompt_embeds_2, 
+                    negative_pooled_prompt_embeds
+                ) = self.model(
+                    prompt=prompt,
+                    prompt_2=prompt_2,
+                    clip_skip=clip_skip,
+                    lora_scale=lora_scale,
+                    num_images_per_prompt=num_images_per_prompt,
+                )
+
+                
+                prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
+                prompt_embeds_2 = torch.cat([negative_prompt_embeds_2, prompt_embeds_2], dim=0)
+                pooled_prompt_embeds = torch.cat([negative_pooled_prompt_embeds, pooled_prompt_embeds], dim=0)
             
-            print(prompt_embeds_1.shape, prompt_embeds_2.shape, pooled_prompt_embeds.shape)
+            print(prompt_embeds.shape, prompt_embeds_2.shape, pooled_prompt_embeds.shape)
 
 
 

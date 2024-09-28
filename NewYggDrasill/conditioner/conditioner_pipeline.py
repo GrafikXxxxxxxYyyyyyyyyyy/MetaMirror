@@ -5,6 +5,7 @@ from diffusers.utils import BaseOutput
 from typing import List, Optional, Union, Dict, Any
 
 from .pipelines.text_encoder_pipeline import (
+    ModelKey,
     TextEncoderPipeline, 
     TextEncoderPipelineInput, 
     TextEncoderPipelineOutput
@@ -32,9 +33,9 @@ class ConditionerPipelineOutput(BaseOutput):
     batch_size: int = 1
     do_cfg: bool = False
     cross_attention_kwargs: Optional[dict] = None
-    text_embeds: Optional[torch.FloatTensor] = None
-    refiner_prompt_embeds: Optional[torch.FloatTensor] = None
-
+    image_embeds: Optional[torch.FloatTensor] = None
+    prompt_embeds_2: Optional[torch.FloatTensor] = None
+    pooled_prompt_embeds: Optional[torch.FloatTensor] = None
 
 
 
@@ -46,16 +47,16 @@ class ConditionerPipeline(
 ):
     model: Optional[ConditionerModel] = None
 
-    # # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
-    # def __init__(
-    #     self,
-    #     model_key: Optional[StableDiffusionModelKey] = None,
-    #     **kwargs,
-    # ):
-    # # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
-    #     if model_key is not None:
-    #         self.model = ConditionerModel(**model_key)
-    # # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
+    def __init__(
+        self,
+        model_key: Optional[ModelKey] = None,
+        **kwargs,
+    ):
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
+        if model_key is not None:
+            self.model = ConditionerModel(**model_key)
+    # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
 
     
 
@@ -71,7 +72,6 @@ class ConditionerPipeline(
 
         # Собираем текстовые и картиночные условия генерации
         te_output: Optional[TextEncoderPipelineOutput] = None
-        # if "1. Вызывам собственный энкодер":
         if te_input is not None:
             te_output = self.encode_prompt(**te_input)
 
@@ -81,25 +81,22 @@ class ConditionerPipeline(
 
         print(te_output)
 
-        # if "2. Вызываем собственную модельку":
-        #     (
-        #         prompt_embeds, 
-        #         text_embeds, 
-        #         refiner_prompt_embeds
-        #     ) = self.model.get_external_conditions(
-        #         **te_output
-        #     )
+        ############################################################################
+        # По идее тут ещё модель что-то должна делать, но я хз что
+        ############################################################################
         
+
+        # if ie_input is not None:
+        #     pass
         
-        
-        # return ConditionerPipelineOutput(
-        #     do_cfg=do_cfg,
-        #     batch_size=batch_size,
-        #     text_embeds=text_embeds,
-        #     prompt_embeds=prompt_embeds,
-        #     refiner_prompt_embeds=refiner_prompt_embeds,
-        #     cross_attention_kwargs=cross_attention_kwargs,
-        # )        
+
+        return ConditionerPipelineOutput(
+            prompt_embeds=te_output.clip_embeds_1,
+            prompt_embeds_2=te_output.clip_embeds_2,
+            do_cfg=do_cfg,
+            batch_size=batch_size,
+            pooled_prompt_embeds=te_output.pooled_clip_embeds
+        )
     # ################################################################################################################ #
 
 
