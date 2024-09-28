@@ -93,7 +93,11 @@ class TextEncoderPipeline:
 
         if "2. Кодируем входные промпты":
             prompt_embeds_1, prompt_embeds_2, pooled_prompt_embeds = self.model(
-
+                prompt=prompt,
+                prompt_2=prompt_2,
+                clip_skip=clip_skip,
+                lora_scale=lora_scale,
+                num_images_per_prompt=num_images_per_prompt,
             )
             if do_cfg:
                 pass

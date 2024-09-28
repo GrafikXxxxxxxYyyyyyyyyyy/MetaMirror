@@ -76,13 +76,13 @@ class StableDiffusionPipeline(ConditionerPipeline, DiffusionPipeline):
 
         #     )
 
-        if "2. Запускаем диффузионный процесс с учётом условной информации":
-            diffusion_output = self.diffusion_process(
-                **DiffusionPipelineInput(
-                    conditions=conditions,
-                    **diffusion_input,
-                )
-            )
+        # if "2. Запускаем диффузионный процесс с учётом условной информации":
+        #     diffusion_output = self.diffusion_process(
+        #         **DiffusionPipelineInput(
+        #             conditions=conditions,
+        #             **diffusion_input,
+        #         )
+        #     )
 
 
 

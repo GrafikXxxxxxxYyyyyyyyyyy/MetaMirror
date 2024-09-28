@@ -28,6 +28,8 @@ class TextEncoderModel(CLIPTextEncoderModel):
         self.model_path = model_path
         self.model_type = model_type or "sd15"
 
+        # TODO: Добавить выбор модели
+
 
 
     def __call__(

@@ -19,6 +19,7 @@ from .conditioner_model import ConditionerModel
 @dataclass
 class ConditionerPipelineInput(BaseOutput):
     te_input: Optional[TextEncoderPipelineInput] = None
+    ie_input = None
 
 
 
