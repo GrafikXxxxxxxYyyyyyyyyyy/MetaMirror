@@ -95,7 +95,7 @@ class TextEncoderPipeline:
                 prompt_embeds, 
                 prompt_embeds_2, 
                 pooled_prompt_embeds
-            ) = self.model(
+            ) = self.model.get_prompt_embeddings(
                 prompt=prompt,
                 prompt_2=prompt_2,
                 clip_skip=clip_skip,
@@ -107,7 +107,7 @@ class TextEncoderPipeline:
                     negative_prompt_embeds, 
                     negative_prompt_embeds_2, 
                     negative_pooled_prompt_embeds
-                ) = self.model(
+                ) = self.model.get_prompt_embeddings(
                     prompt=prompt,
                     prompt_2=prompt_2,
                     clip_skip=clip_skip,
@@ -119,23 +119,17 @@ class TextEncoderPipeline:
                 prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
                 prompt_embeds_2 = torch.cat([negative_prompt_embeds_2, prompt_embeds_2], dim=0)
                 pooled_prompt_embeds = torch.cat([negative_pooled_prompt_embeds, pooled_prompt_embeds], dim=0)
-            
-            print(prompt_embeds.shape, prompt_embeds_2.shape, pooled_prompt_embeds.shape)
 
 
 
-        # return TextEncoderPipelineOutput(
-        #     do_cfg=do_cfg,
-        #     batch_size=batch_size,
-        #     clip_embeds_1=clip_output.prompt_embeds_1,
-        #     clip_embeds_2=clip_output.prompt_embeds_2,
-        #     pooled_clip_embeds=clip_output.pooled_prompt_embeds,
-        #     cross_attention_kwargs=(
-        #         {"scale": lora_scale}
-        #         if lora_scale is not None else
-        #         None
-        #     )
-        # )
+        return TextEncoderPipelineOutput(
+            do_cfg=do_cfg,
+            batch_size=batch_size,
+            prompt_embeds=prompt_embeds,
+            prompt_embeds_2=prompt_embeds_2,
+            pooled_prompt_embeds=pooled_prompt_embeds,
+            cross_attention_kwargs=(None if lora_scale is None else {"scale": lora_scale}),
+        )
 
     
     

@@ -20,7 +20,6 @@ from .conditioner_model import ConditionerModel
 @dataclass
 class ConditionerPipelineInput(BaseOutput):
     te_input: Optional[TextEncoderPipelineInput] = None
-    ie_input = None
 
 
 
@@ -65,7 +64,7 @@ class ConditionerPipeline(
         self,
         te_input: TextEncoderPipelineInput,
             # ie_output: Optional[ImageEncoderPipelineOutput] = None,
-            # use_refiner
+        **kwargs
     ):
     # ################################################################################################################ #
         print(te_input)
@@ -75,11 +74,6 @@ class ConditionerPipeline(
         if te_input is not None:
             te_output = self.encode_prompt(**te_input)
 
-            do_cfg = te_output.do_cfg
-            batch_size = te_output.batch_size
-            cross_attention_kwargs = te_output.cross_attention_kwargs
-
-        print(te_output)
 
         ############################################################################
         # По идее тут ещё модель что-то должна делать, но я хз что
@@ -91,11 +85,12 @@ class ConditionerPipeline(
         
 
         return ConditionerPipelineOutput(
-            prompt_embeds=te_output.clip_embeds_1,
-            prompt_embeds_2=te_output.clip_embeds_2,
-            do_cfg=do_cfg,
-            batch_size=batch_size,
-            pooled_prompt_embeds=te_output.pooled_clip_embeds
+            do_cfg=te_output.do_cfg,
+            batch_size=te_output.batch_size,
+            prompt_embeds=te_output.prompt_embeds,
+            prompt_embeds_2=te_output.prompt_embeds_2,
+            pooled_prompt_embeds=te_output.pooled_prompt_embeds,
+            cross_attention_kwargs=te_output.cross_attention_kwargs,
         )
     # ################################################################################################################ #
 
@@ -115,9 +110,7 @@ class ConditionerPipeline(
         ):
             self.model = conditioner
 
-        print(input)
-
-        return self.retrieve_external_conditions(**input)
+        return self.retrieve_external_conditions(input.te_input)
     # ================================================================================================================ #
 
 
