@@ -24,8 +24,6 @@ class BackwardDiffuserConditions(BaseOutput):
     do_cfg: bool = False
     guidance_scale: float = 5.0
     conditions: Optional[Conditions] = None
-    mask_sample: Optional[torch.FloatTensor] = None
-    masked_sample: Optional[torch.FloatTensor] = None
 
 
 
@@ -100,9 +98,6 @@ class BackwardDiffuser(NoiseScheduler):
         do_cfg: bool = False,
         guidance_scale: float = 5.0,
         conditions: Optional[Conditions] = None,
-        mask_sample: Optional[torch.FloatTensor] = None,
-        masked_sample: Optional[torch.FloatTensor] = None,
-        **kwargs,
     ) -> torch.FloatTensor:
         """
         Делает один шаг снятия шума

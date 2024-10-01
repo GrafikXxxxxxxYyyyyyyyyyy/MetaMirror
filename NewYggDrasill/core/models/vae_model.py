@@ -5,9 +5,6 @@ from diffusers import AutoencoderKL
 
 
 
-
-
-
 class VaeModel:
     vae: AutoencoderKL
 

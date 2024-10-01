@@ -42,10 +42,7 @@ class DiffusionPipelineOutput(BaseOutput):
 
 
 
-class DiffusionPipeline(
-    VaePipeline,
-    ForwardDiffusion,
-):
+class DiffusionPipeline(VaePipeline, ForwardDiffusion):
     """
     Данный класс служит для того, чтобы выполнять полностью проход
     прямого и обратного диффузионного процессов и учитывать использование VAE
@@ -140,13 +137,6 @@ class DiffusionPipeline(
             print(forward_output)
 
 
-
-        # Учитываем CFG для масок и картинок
-        if do_cfg:
-            processor_output.mask_latents = torch.cat([processor_output.mask_latents] * 2)
-            processor_output.masked_image_latents = torch.cat([processor_output.masked_image_latents] * 2)
-
-
         noisy_sample = forward_output.noisy_sample
         for i, t in tqdm(enumerate(forward_output.timesteps)):
             # Учитываем что может быть inpaint модель
@@ -158,9 +148,10 @@ class DiffusionPipeline(
             noisy_sample = self.model.backward_step(
                 timestep=t,
                 noisy_sample=noisy_sample,
-                do_cfg=do_cfg,
-                guidance_scale=guidance_scale,
-                conditions=conditions,
+                # do_cfg=do_cfg,
+                # guidance_scale=guidance_scale,
+                # conditions=conditions,
+                **backward_coditions
             )
             
             # TODO: Добавить обработку маски через image
