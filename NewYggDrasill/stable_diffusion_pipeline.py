@@ -56,37 +56,14 @@ class StableDiffusionPipeline(ConditionerPipeline, DiffusionPipeline):
     def __call__(
         self,
         model: StableDiffusionModel,
-        diffusion_input: DiffusionPipelineInput,
-        # use_refiner: bool = False,
-        # aesthetic_score: float = 6.0,
-        # negative_aesthetic_score: float = 2.5,
-        conditioner_input: Optional[ConditionerPipelineInput] = None,
-        **kwargs,
     ):  
     # ================================================================================================================ #
         self.model = model
 
-        if "1. Собираем и преобразуем обуславливающую информацию":
-            conditioner_output = self.retrieve_external_conditions(**conditioner_input)
-
-        print(conditioner_output)
-            
-        # if "2. Вызываем лежащую внутри модельку":
-        #     conditions = self.model.get_diffusion_conditions(
-
-        #     )
-
-        # if "2. Запускаем диффузионный процесс с учётом условной информации":
-        #     diffusion_output = self.diffusion_process(
-        #         **DiffusionPipelineInput(
-        #             conditions=conditions,
-        #             **diffusion_input,
-        #         )
-        #     )
+        
 
 
-
-        return StableDiffusionPipelineOutput(**diffusion_output)  
+        return StableDiffusionPipelineOutput)  
     # ================================================================================================================ #
 
 

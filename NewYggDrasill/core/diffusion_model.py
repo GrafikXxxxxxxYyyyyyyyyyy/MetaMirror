@@ -9,31 +9,22 @@ from .models.backward_diffuser import BackwardDiffuserKey, BackwardDiffuserCondi
 
 
 
-
-
 @dataclass
 class DiffusionModelKey(BackwardDiffuserKey):
     is_latent_model: bool = True
 
 
 
-
-
 @dataclass
 class DiffusionModelConditions(BaseOutput):
-    need_time_ids: bool = True
-    aesthetic_score: float = 6.0
-    negative_aesthetic_score: float = 2.5
-    text_encoder_projection_dim: Optional[int] = None
-
-    need_timestep_cond: bool = False
-
+    # need_time_ids: bool = True
+    # aesthetic_score: float = 6.0
+    # negative_aesthetic_score: float = 2.5
+    # text_encoder_projection_dim: Optional[int] = None
+    # need_timestep_cond: bool = False
     backward_conditions: Optional[BackwardDiffuserConditions] = None
-
     # ControlNet conditions
     # ...
-
-
 
 
 
@@ -95,10 +86,8 @@ class DiffusionModel(BackwardDiffuser):
 
     # # TODO: добавить ControlNet
     # # ################################################################################################################ #
-    # def get_extended_conditions(
+    # def get_controlnet_conditioning(
     #     self,
-    #     batch_size: int = 1,
-    #     do_cfg: bool = False,
     #     **kwargs,
     # ) -> Optional[Conditions]:
     # # ################################################################################################################ #
@@ -201,8 +190,6 @@ class DiffusionModel(BackwardDiffuser):
     # # ================================================================================================================ #
     # def __call__(self, **kwargs):
     # # ================================================================================================================ #
-    #     print("DiffusionModel --->")
-
-    #     return self.get_extended_conditions(**kwargs)
+        # pass
     # # ================================================================================================================ #
     

@@ -30,7 +30,6 @@ class VaePipelineOutput(BaseOutput):
 
 
 
-
 class VaePipeline:
     vae: Optional[VaeModel] = None
 
@@ -48,7 +47,6 @@ class VaePipeline:
         self, 
         width: Optional[int] = None,
         height: Optional[int] = None,
-            # vae: Optional[VaeModel] = None,
         image: Optional[PipelineImageInput] = None,
         generator: Optional[torch.Generator] = None,
         mask_image: Optional[PipelineImageInput] = None,
@@ -60,8 +58,6 @@ class VaePipeline:
         2) Кодирует картинку (и маски) в латентное представление
         3) Декодирует пришедшие на вход латентные представления
         """
-        print("VaePipeline --->")
-        
         use_vae = True if self.vae is not None else False
 
         # Инициализируем необходимые классы
@@ -85,29 +81,33 @@ class VaePipeline:
         output = VaePipelineOutput()
 
 
+
+        # Предобрабатываем пришедшие на вход изображения (и их маски)
         images: Optional[torch.FloatTensor] = None
         mask_latents: Optional[torch.FloatTensor] = None
         image_latents: Optional[torch.FloatTensor] = None
         masked_image_latents: Optional[torch.FloatTensor] = None
-        # Предобрабатываем пришедшие на вход изображения (и их маски)
         if image is not None:
             image = image_processor.preprocess(image)    
-            if height is not None and width is not None:
+            if (
+                height is not None 
+                and width is not None
+            ):
                 image = torch.nn.functional.interpolate(
                     image, 
                     size=(height, width)
                 )
-                
-                # Возвращает либо латентное представление картинки
-                # либо запроцешенную картинку
-                image_latents = (
-                    self.vae(
-                        images=image,
-                        generator=generator,
-                    )[0]
-                    if use_vae else
-                    image
-                )
+            
+            # Возвращает либо латентное представление картинки
+            # либо запроцешенную картинку
+            image_latents = (
+                self.vae(
+                    images=image,
+                    generator=generator,
+                )[0]
+                if use_vae else
+                image
+            )
 
             if mask_image is not None:
                 mask_image = mask_processor.preprocess(mask_image)        
@@ -117,6 +117,7 @@ class VaePipeline:
                         size=(height, width)
                     )
                 masked_image = image * (mask_image < 0.5)
+                
                 mask_latents = (
                     torch.nn.functional.interpolate(
                         mask_image, 
@@ -137,6 +138,8 @@ class VaePipeline:
                     if use_vae else
                     masked_image
                 )
+
+
 
         if latents is not None:
             images = (
@@ -166,6 +169,8 @@ class VaePipeline:
     ):
         if vae is not None:
             self.vae = vae
+
+        print(input)
 
         return self.vae_pipeline_call(**input)
 

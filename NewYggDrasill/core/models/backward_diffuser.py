@@ -9,13 +9,9 @@ from .models.noise_predictor import ModelKey, Conditions, NoisePredictor
 
 
 
-
-
 @dataclass
 class BackwardDiffuserKey(ModelKey):
     scheduler_name: str = "euler"
-
-
 
 
 
@@ -27,9 +23,6 @@ class BackwardDiffuserConditions(BaseOutput):
 
 
 
-
-
-# МОДЕЛЬ НАСЛЕДУЕТСЯ ОТ ПЛАНИРОВЩИКА
 class BackwardDiffuser(NoiseScheduler):
     predictor: NoisePredictor
     
@@ -71,22 +64,20 @@ class BackwardDiffuser(NoiseScheduler):
 
         print("\t<<<BackwardDiffuser ready!>>>\t")
 
-        return
+
+    # def maybe_switch_to_refiner(self, use_refiner: bool):
+    #     if use_refiner:
+    #         self.predictor = NoisePredictor(
+    #             model_path="REFINER_PATH",
+    #             **self.key,
+    #         )
+    #         self.use_refiner = True
 
 
-    def maybe_switch_to_refiner(self, use_refiner: bool):
-        if use_refiner:
-            self.predictor = NoisePredictor(
-                model_path="REFINER_PATH",
-                **self.key,
-            )
-            self.use_refiner = True
-
-
-    def maybe_switch_to_base(self, use_refiner: bool):
-        if not use_refiner:
-            self.predictor = NoisePredictor(**self.key)
-            self.use_refiner = False
+    # def maybe_switch_to_base(self, use_refiner: bool):
+    #     if not use_refiner:
+    #         self.predictor = NoisePredictor(**self.key)
+    #         self.use_refiner = False
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
 
 

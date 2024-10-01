@@ -79,7 +79,7 @@ class VaeModel:
 
         if self.config.force_upcast:
             image = image.float()
-            self.to(dtype=torch.float32)
+            self.vae.to(dtype=torch.float32)
 
         latents = self.retrieve_latents(
             self.vae.encode(image), 
@@ -89,7 +89,7 @@ class VaeModel:
         latents = self.config.scaling_factor * latents
 
         if self.config.force_upcast:
-            self.to(dtype=_dtype)
+            self.vae.to(dtype=_dtype)
 
         return latents
 
@@ -115,29 +115,6 @@ class VaeModel:
         return images
     # ################################################################################################################ #
     
-
-
-    # def get_processed_latents_or_images(
-    #     self,
-    #     images: Optional[torch.FloatTensor] = None,
-    #     latents: Optional[torch.FloatTensor] = None,
-    #     generator: Optional[torch.Generator] = None,
-    #     **kwargs,
-    # ) -> Tuple[
-    #     Optional[torch.FloatTensor],
-    #     Optional[torch.FloatTensor],
-    # ]:
-    #     encoded_images = images
-    #     if images is not None:
-    #         images = images.to(device=self.device, dtype=self.dtype)
-    #         encoded_images = self.encode(images, generator)
-
-    #     decoded_images = latents
-    #     if latents is not None:
-    #         decoded_images = self.decode(latents)
-        
-    #     return encoded_images, decoded_images
-
 
 
     # ================================================================================================================ #

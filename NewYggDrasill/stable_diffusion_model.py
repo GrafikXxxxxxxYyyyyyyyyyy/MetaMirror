@@ -9,8 +9,6 @@ from .core.diffusion_model import DiffusionModelKey, DiffusionModelConditions, D
 
 
 
-
-
 @dataclass
 class StableDiffusionModelKey(DiffusionModelKey):
     use_ip_adapter: bool = False
@@ -18,14 +16,9 @@ class StableDiffusionModelKey(DiffusionModelKey):
 
 
 
-
-
 @dataclass
 class StableDiffusionConditions(DiffusionModelConditions):
     use_refiner: bool = False
-
-
-
 
 
 
@@ -68,16 +61,6 @@ class StableDiffusionModel(DiffusionModel, ConditionerModel):
 
         print("\t<<<StableDiffusionModel ready!>>>\t")
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #    
-
-
-
-    # def get_diffusion_conditions(
-    #     self, 
-    #     use_refiner:
-    #     **kwargs
-    # ):
-    #     pass
-
 
 
     # ================================================================================================================ #
