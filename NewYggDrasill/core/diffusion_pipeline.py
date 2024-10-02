@@ -6,31 +6,26 @@ from dataclasses import dataclass
 from diffusers.utils import BaseOutput
 from diffusers.image_processor import PipelineImageInput
 
-from .diffusion_model import Conditions, DiffusionModel
+from .diffusion_model import DiffusionModel
 from .pipelines.vae_pipeline import VaePipeline
 from .pipelines.forward_diffusion import ForwardDiffusion, ForwardDiffusionInput
 
 
 
-
-
-
 @dataclass
 class DiffusionPipelineInput(BaseOutput):
+    width: int = 512
+    height: int = 512
     batch_size: int = 1
     do_cfg: bool = False
     guidance_scale: float = 5.0
-    width: Optional[int] = None
-    height: Optional[int] = None
     conditions: Optional[Conditions] = None
-    image: Optional[PipelineImageInput] = None
+    image: Optional[torch.FloatTensor] = None
     generator: Optional[torch.Generator] = None
-    mask_image: Optional[PipelineImageInput] = None
+    mask_image: Optional[torch.FloatTensor] = None
+    masked_image: Optional[torch.FloatTensor] = None
     forward_input: Optional[ForwardDiffusionInput] = None
     
-
-
-
 
 
 @dataclass
@@ -39,18 +34,12 @@ class DiffusionPipelineOutput(BaseOutput):
 
 
 
-
-
-
 class DiffusionPipeline(VaePipeline, ForwardDiffusion):
     """
     Данный класс служит для того, чтобы выполнять полностью проход
-    прямого и обратного диффузионного процессов и учитывать использование VAE
+    прямого и обратного диффузионного процессов
     """
     model: Optional[DiffusionModel] = None
-
-    aesthetic_score: float = 6.0
-    negative_aesthetic_score: float = 2.5
 
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
     def __init__(
@@ -65,59 +54,38 @@ class DiffusionPipeline(VaePipeline, ForwardDiffusion):
 
     def diffusion_process(
         self,
+        width: int = 512,
+        height: int = 512,
         batch_size: int = 1,
         do_cfg: bool = False,
         guidance_scale: float = 5.0,
-        width: Optional[int] = None,
-        height: Optional[int] = None,
         conditions: Optional[Conditions] = None,
         image: Optional[torch.FloatTensor] = None,
         generator: Optional[torch.Generator] = None,
         mask_image: Optional[torch.FloatTensor] = None,
+        masked_image: Optional[torch.FloatTensor] = None,
         forward_input: Optional[ForwardDiffusionInput] = None,
         **kwargs,
     ):  
         """
         Выполняет полностью ПРЯМОЙ + ОБРАТНЫЙ диффузионные процессы из заданных условий
         """
-
-        # TODO: Это нужно перенести в метод .__call__()
-        if "1. Возможно предобрабатываем входные данные":
-            # Должен быть self.vae: VaeModel
-            processor_output = self.vae_pipeline_call(
-                width = width,
-                height = height,
-                image = image,
-                generator = generator,
-                mask_image = mask_image,
-            )
-
-            initial_image = processor_output.image_latents
-
-            # Учитываем возможные пользовательские размеры изображений
-            if initial_image is not None:
-                width, height = initial_image.shape[2:]
-            else:
-                width = width or self.model.sample_size
-                height = height or self.model.sample_size
-
-            # Учитываем batch_size если он был изменен
-            if processor_output.mask_latents is not None:
-                processor_output.mask_latents = processor_output.mask_latents.repeat(
-                    batch_size // processor_output.mask_latents.shape[0], 1, 1, 1
-                )
-            if processor_output.masked_image_latents is not None:
-                processor_output.masked_image_latents = processor_output.masked_image_latents.repeat(
-                    batch_size // processor_output.masked_image_latents.shape[0], 1, 1, 1
-                )
-
-            print(processor_output)
+        # # TODO: Вынести это на уровень StableDiffusion
+        # # Учитываем batch_size если он был изменен
+        # if mask_image is not None:
+        #     mask_image = mask_image.repeat(
+        #         batch_size // mask_image.shape[0], 1, 1, 1
+        #     )
+        # if masked_image is not None:
+        #     masked_image = masked_image.repeat(
+        #         batch_size // masked_image.shape[0], 1, 1, 1
+        #     )
 
 
 
         if "Выполняется ForwardDiffusion":
+            forward_input.sample = image
             forward_input.generator = generator
-            forward_input.sample = initial_image
             forward_input.dtype = self.model.dtype
             forward_input.device = self.model.device
             # forward_input.denoising_end = 
@@ -137,13 +105,11 @@ class DiffusionPipeline(VaePipeline, ForwardDiffusion):
             print(forward_output)
 
 
-        noisy_sample = forward_output.noisy_sample
+
         for i, t in tqdm(enumerate(forward_output.timesteps)):
             # Учитываем что может быть inpaint модель
             if self.model.predictor.is_inpainting_model:
-                noisy_sample = torch.cat([
-                    noisy_sample, processor_output.mask_latents, processor_output.masked_image_latents
-                ], dim=1)   
+                noisy_sample = torch.cat([noisy_sample, mask_image, masked_image], dim=1)   
                 
             noisy_sample = self.model.backward_step(
                 timestep=t,

@@ -12,9 +12,6 @@ from typing import Optional, Union, Dict, Any
 
 
 
-
-
-
 @dataclass
 class ModelKey(BaseOutput):
     """
@@ -25,9 +22,6 @@ class ModelKey(BaseOutput):
     device: str = "cuda"
     model_type: str = "sdxl"
     model_path: str = "GrafikXxxxxxxYyyyyyyyyyy/sdxl_Juggernaut"
-
-
-
 
 
 
@@ -45,9 +39,6 @@ class Conditions(BaseOutput):
     attention_mask: Optional[torch.Tensor] = None
     cross_attention_kwargs: Optional[Dict[str, Any]] = None
     added_cond_kwargs: Optional[Dict[str, torch.Tensor]] = None
-
-
-
 
 
 
@@ -140,14 +131,12 @@ class NoisePredictor:
         elif isinstance(self.predictor, FluxTransformer2DModel):
             pass
 
-
         # Предсказывает шум моделью + собранными параметрами
         predicted_noise = self.predictor(
             timestep=timestep,
             sample=noisy_sample,
             **conditions,
         )
-
 
         return predicted_noise
     # ================================================================================================================ #

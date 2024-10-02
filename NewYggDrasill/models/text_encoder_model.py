@@ -7,9 +7,10 @@ from .models.transformer_te_model import TransformerTextEncoderModel
 
 
 
-class TextEncoderModel(CLIPTextEncoderModel):
-    transformer_encoder: Optional[TransformerTextEncoderModel] = None
-
+class TextEncoderModel(
+    CLIPTextEncoderModel,
+    TransformerTextEncoderModel
+):
     def __init__(
         self,
         model_path: str,

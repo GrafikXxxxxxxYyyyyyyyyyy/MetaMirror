@@ -4,11 +4,8 @@ from dataclasses import dataclass
 from diffusers.utils import BaseOutput
 from typing import List, Optional, Union, Dict, Any
 
-from ...core.models.models.noise_predictor import ModelKey
+from ..core.diffusion_model import DiffusionModelKey
 from ..models.text_encoder_model import TextEncoderModel
-
-
-
 
 
 
@@ -24,31 +21,25 @@ class TextEncoderPipelineInput(BaseOutput):
 
 
 
-
-
-
 @dataclass
 class TextEncoderPipelineOutput(BaseOutput):
     do_cfg: bool
     batch_size: int
-    prompt_embeds: torch.FloatTensor
-    prompt_embeds_2: Optional[torch.FloatTensor] = None
-    pooled_prompt_embeds: Optional[torch.FloatTensor] = None
+    clip_embeds_1: torch.FloatTensor
+    clip_embeds_2: Optional[torch.FloatTensor] = None
+    transformer_embeds: Optional[torch.FloatTensor] = None
+    pooled_clip_embeds: Optional[torch.FloatTensor] = None
     cross_attention_kwargs: Optional[Dict[str, Any]] = None
 
 
 
-
-
-
-# НИ ОТ ЧЕГО НЕ НАСЛЕДУЕТСЯ + ХРАНИТ СВОЙ TextEncoder
 class TextEncoderPipeline:  
     model: Optional[TextEncoderModel] = None
 
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
     def __init__(
         self,
-        model_key: Optional[ModelKey] = None,
+        model_key: Optional[DiffusionModelKey] = None,
         **kwargs,
     ):
     # //////////////////////////////////////////////////////////////////////////////////////////////////////////////// #
@@ -88,6 +79,7 @@ class TextEncoderPipeline:
                 negative_prompt_2 = [negative_prompt_2] if isinstance(negative_prompt_2, str) else negative_prompt_2
 
             batch_size = len(prompt) * num_images_per_prompt
+
 
 
         if "2. Кодируем входные промпты":

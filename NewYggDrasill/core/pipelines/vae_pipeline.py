@@ -43,7 +43,7 @@ class VaePipeline:
     
 
 
-    def vae_pipeline_call(
+    def maybe_process_images_latents(
         self, 
         width: Optional[int] = None,
         height: Optional[int] = None,
@@ -167,12 +167,13 @@ class VaePipeline:
         vae: Optional[VaeModel] = None,
         **kwargs,
     ):
-        if vae is not None:
+        if (
+            vae is not None
+            and isinstance(vae, VaeModel)
+        ):
             self.vae = vae
 
-        print(input)
-
-        return self.vae_pipeline_call(**input)
+        return self.maybe_process_images_latents(**input)
 
 
 
